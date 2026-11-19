@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121214">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ReelNest</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a quiet cinema lobby. Charcoal room, warm amber marquee light on what to watch next;
+   posters carry the colour, chrome stays out of the way. Sidebar on wide screens, glass tab bar on phones. */
+:root {
+  --bg: #f6f3ee;
+  --surface: #ffffff;
+  --surface-2: #efe9e1;
+  --ink: #1d1a16;
+  --ink-muted: #5f574d;
+  --line: #ddd4c8;
+  --accent: #a35a00;
+  --accent-ink: #ffffff;
+  --accent-soft: #fbe5c6;
+  --good: #1d7a55;
+  --warn: #b3261e;
+  --glass: rgba(255, 255, 255, 0.78);
+  --shadow: 0 1px 2px rgba(40, 28, 10, .06), 0 8px 24px rgba(40, 28, 10, .07);
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-sm: 10px; --r-md: 16px; --r-lg: 22px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121214; --surface: #1b1b1f; --surface-2: #26262b; --ink: #f2ede6;
+    --ink-muted: #b5ada3; --line: #34333a; --accent: #ffb547; --accent-ink: #2b1700; --accent-soft: #3d2b12;
+    --good: #6fd3a8; --warn: #ffb4ab; --glass: rgba(24, 24, 28, 0.78);
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121214; --surface: #1b1b1f; --surface-2: #26262b; --ink: #f2ede6;
+  --ink-muted: #b5ada3; --line: #34333a; --accent: #ffb547; --accent-ink: #2b1700; --accent-soft: #3d2b12;
+  --good: #6fd3a8; --warn: #ffb4ab; --glass: rgba(24, 24, 28, 0.78);
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-muted); }
+.small { font-size: 14px; }
+.tiny { font-size: 13px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- app shell ---------- */
+.shell { display: grid; grid-template-columns: 1fr; min-height: 100%; }
+.side { display: none; }
+main { padding: 0 16px calc(96px + env(safe-area-inset-bottom)); max-width: 1120px; width: 100%; margin: 0 auto; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 0 12px; }
+.topbar h1 { font-size: 30px; font-weight: 800; flex: 1; }
+.tabbar {
+  position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 6px;
+  background: var(--glass); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow);
+}
+.tab {
+  display: grid; justify-items: center; gap: 2px; padding: 8px 2px; border: 0; background: none; border-radius: 18px;
+  color: var(--ink-muted); font-size: 12px; font-weight: 600; min-height: 52px;
+}
+.tab svg { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--ink); background: var(--accent-soft); }
+.tab[aria-current="page"] svg { color: var(--accent); }
+@media (min-width: 900px) {
+  .shell { grid-template-columns: 236px 1fr; }
+  .tabbar { display: none; }
+  main { padding: 0 32px 48px; }
+  .side {
+    display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; padding: 28px 16px;
+    border-right: 1px solid var(--line); background: var(--surface);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 22px; padding: 0 10px 22px; }
+  .side .tab { display: flex; justify-content: flex-start; gap: 12px; font-size: 16px; padding: 10px 12px; min-height: 46px; }
+  .side .tab:hover { background: var(--surface-2); color: var(--ink); }
+  .side .foot { margin-top: auto; padding: 10px; font-size: 13px; color: var(--ink-muted); }
+}
+
+/* ---------- primitives ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; white-space: nowrap;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.btn:hover { border-color: var(--ink-muted); }
+.btn:active { transform: scale(.98); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn.danger { color: var(--warn); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.icon-btn {
+  width: 44px; height: 44px; display: inline-grid; place-items: center; border-radius: 999px; border: 1px solid transparent;
+  background: transparent; color: var(--ink);
+}
+.icon-btn:hover { background: var(--surface-2); }
+.icon-btn svg { width: 22px; height: 22px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); font-size: 15px; font-weight: 600; white-space: nowrap;
+}
+.chip:hover { border-color: var(--ink-muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.wrap-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: var(--surface-2); color: var(--ink-muted); white-space: nowrap;
+}
+.pill.accent { background: var(--accent-soft); color: var(--ink); }
+.pill.demo { background: transparent; border: 1px dashed var(--ink-muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+.field { display: grid; gap: 6px; }
+.field label { font-weight: 600; font-size: 14px; }
+.input {
+  width: 100%; min-height: 48px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface);
+}
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input.err { border-color: var(--warn); }
+.err-text { color: var(--warn); font-size: 13px; }
+textarea.input { min-height: 96px; resize: vertical; }
+.search { position: relative; }
+.search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--ink-muted); }
+.search .input { padding-left: 44px; border-radius: 999px; min-height: 50px; font-size: 16px; }
+.section { display: grid; gap: 12px; margin-top: 28px; }
+.section-head { display: flex; align-items: baseline; gap: 12px; }
+.section-head h2 { font-size: 21px; font-weight: 700; flex: 1; }
+.link-btn { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 6px 4px; }
+.banner { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; }
+.banner.warn { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); }
+.progress { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.skeleton { background: var(--surface-2); border-radius: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  .fade-in { animation: fade .22s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+}
+
+/* ---------- posters ---------- */
+.poster { position: relative; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; background: var(--surface-2); flex: none; }
+.poster img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+.poster .ph {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 10%;
+  color: #fff; font-family: var(--font-display); font-weight: 800; line-height: 1.05; letter-spacing: -0.01em;
+}
+.poster .ph .t { font-size: clamp(11px, 2.6cqw + 6px, 22px); text-shadow: 0 1px 8px rgba(0,0,0,.25); overflow-wrap: anywhere; }
+.poster .ph .k { font-family: var(--font-body); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .85; margin-bottom: 6px; }
+.poster { container-type: inline-size; }
+.poster .ph .i { display: none; font-size: 20px; align-self: center; margin: auto 0; }
+@container (max-width: 100px) {
+  .poster .ph { justify-content: center; align-items: center; padding: 0; }
+  .poster .ph .t, .poster .ph .k { display: none; }
+  .poster .ph .i { display: block; }
+}
+.poster .badge { position: absolute; top: 8px; left: 8px; }
+
+/* ---------- home ---------- */
+.next-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .next-grid { grid-template-columns: 1fr 1fr; } }
+.next-card { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px; }
+.next-card .title { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.2; }
+.next-card .ep { font-weight: 600; margin-top: 2px; }
+.watch-btn {
+  width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: transform .12s;
+}
+.watch-btn:hover { transform: scale(1.05); }
+.watch-btn:active { transform: scale(.95); }
+.watch-btn svg { width: 28px; height: 28px; }
+.row-list { display: grid; }
+.row { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 10px 6px; border-radius: 14px; border: 0; background: none; text-align: left; width: 100%; }
+.row:hover { background: var(--surface-2); }
+.row .t { font-weight: 600; }
+.shelf { display: grid; grid-auto-flow: column; grid-auto-columns: 128px; gap: 14px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+/* Explicit widths: Safari does not stretch <button> grid items, and a poster with container-type inside a
+   shrink-to-fit button collapses to zero width. */
+.tile { border: 0; background: none; padding: 0; text-align: left; display: grid; gap: 8px; width: 100%; min-width: 0; }
+.next-card > .tile { width: 84px; }
+.tile .t { font-weight: 600; font-size: 15px; line-height: 1.3; }
+.tile:hover .poster { box-shadow: 0 0 0 3px var(--accent); }
+.hero-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px;
+}
+.stat { padding: 14px 16px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); }
+.stat b { display: block; font-family: var(--font-display); font-size: 28px; line-height: 1.1; }
+.stat span { font-size: 13px; color: var(--ink-muted); font-weight: 600; }
+
+/* ---------- lists / grid ---------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 18px 14px; }
+.result { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: center; padding: 10px; border-radius: 16px; }
+.result:hover { background: var(--surface-2); }
+.result .t { font-weight: 700; font-size: 17px; line-height: 1.25; }
+.meta-line { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* ---------- detail ---------- */
+.detail-hero { position: relative; margin: 0 -16px; padding: calc(12px + env(safe-area-inset-top)) 16px 20px; overflow: hidden; }
+.detail-hero::before {
+  content: ""; position: absolute; inset: 0; background: var(--hero, var(--surface-2)); opacity: .9;
+  mask-image: linear-gradient(to bottom, #000 30%, transparent); -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent);
+}
+.detail-hero > * { position: relative; }
+.detail-hero .backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .38;
+  mask-image: linear-gradient(to bottom, #000 35%, transparent 95%); -webkit-mask-image: linear-gradient(to bottom, #000 35%, transparent 95%); }
+:root[data-theme="light"] .detail-hero .backdrop { opacity: .22; }
+.tagline { font-style: italic; color: var(--ink-muted); font-size: 17px; }
+.score { display: flex; align-items: baseline; gap: 8px; }
+.score b { font-family: var(--font-display); font-size: 22px; color: var(--accent); }
+.prov-group { display: grid; gap: 8px; }
+.prov-label { font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-muted); }
+.prov-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.prov { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 600; font-size: 14px; }
+.prov-logo { position: relative; width: 28px; height: 28px; border-radius: 7px; overflow: hidden; background: var(--surface-2); flex: none; }
+.prov-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.facts { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 8px 18px; margin: 0; }
+.facts dt { color: var(--ink-muted); font-weight: 600; font-size: 14px; }
+.facts dd { margin: 0; }
+a.btn { text-decoration: none; color: inherit; }
+.detail-head { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: end; margin-top: 8px; }
+@media (min-width: 720px) { .detail-head { grid-template-columns: 180px 1fr; gap: 28px; } .detail-hero { margin: 0 -32px; padding-left: 32px; padding-right: 32px; } }
+.detail-head h1 { font-size: clamp(26px, 4vw, 40px); font-weight: 800; line-height: 1.05; }
+.detail-cols { display: grid; gap: 20px; }
+@media (min-width: 980px) { .detail-cols { grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); align-items: start; } }
+.panel { padding: 18px; display: grid; gap: 16px; }
+.panel h3 { font-size: 18px; font-weight: 700; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 14px; }
+.seg button { flex: 1 0 auto; border: 0; background: none; padding: 9px 12px; border-radius: 10px; font-weight: 600; font-size: 14px; color: var(--ink-muted); white-space: nowrap; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.toggle-row { display: flex; align-items: center; gap: 12px; }
+.switch { position: relative; width: 52px; height: 32px; border-radius: 99px; border: 0; background: var(--line); flex: none; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: left .15s; }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { left: 24px; }
+.rating { display: flex; gap: 4px; flex-wrap: wrap; }
+.rating button { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 14px; }
+.rating button:hover { border-color: var(--accent); }
+.rating button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.season { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+.season-head { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; width: 100%; padding: 14px 16px; border: 0; background: none; text-align: left; }
+.season-head:hover { background: var(--surface-2); }
+.season-head .t { font-weight: 700; font-size: 17px; }
+.season-body { border-top: 1px solid var(--line); }
+.ep-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: start; padding: 10px 8px 10px 10px; border-top: 1px solid var(--line); }
+.ep-row:first-child { border-top: 0; }
+.check {
+  width: 36px; height: 36px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; color: transparent;
+  transition: background .12s, border-color .12s;
+}
+.check:hover { border-color: var(--accent); }
+.check[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.check[disabled] { opacity: .4; cursor: not-allowed; }
+.check svg { width: 20px; height: 20px; }
+.ep-row .t { font-weight: 600; }
+.ep-row.watched .t { color: var(--ink-muted); }
+.spoiler { border: 0; background: none; padding: 2px 0; color: var(--accent); font-weight: 600; font-size: 14px; }
+.menu { position: relative; }
+.menu-pop {
+  position: absolute; right: 0; top: 100%; z-index: 30; min-width: 230px; padding: 6px; display: grid;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+}
+.menu-pop button { border: 0; background: none; text-align: left; padding: 11px 12px; border-radius: 10px; font-weight: 500; }
+.menu-pop button:hover { background: var(--surface-2); }
+
+/* ---------- overlay ---------- */
+.scrim { position: fixed; inset: 0; z-index: 50; background: rgba(10, 8, 6, .5); display: grid; align-items: end; justify-items: center; }
+@media (min-width: 720px) { .scrim { align-items: center; } }
+.sheet {
+  width: min(560px, 100%); max-height: 88vh; overflow: auto; background: var(--surface); color: var(--ink);
+  border-radius: 26px 26px 0 0; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); display: grid; gap: 16px;
+}
+@media (min-width: 720px) { .sheet { border-radius: 26px; } }
+.sheet h2 { font-size: 22px; font-weight: 800; }
+.sheet .actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 60;
+  display: flex; align-items: center; gap: 14px; max-width: calc(100% - 32px); padding: 12px 12px 12px 18px;
+  background: var(--ink); color: var(--bg); border-radius: 16px; box-shadow: var(--shadow); font-weight: 600;
+}
+@media (min-width: 900px) { .toast { bottom: 28px; left: calc(50% + 118px); } }
+.toast button { border: 0; background: var(--accent); color: var(--accent-ink); border-radius: 10px; padding: 8px 14px; font-weight: 700; }
+.toast .x { background: transparent; color: var(--bg); padding: 8px; }
+.empty { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 40px 16px; }
+.empty h3 { font-size: 22px; font-weight: 800; }
+.empty p { max-width: 46ch; margin: 0; color: var(--ink-muted); }
+.empty .btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.cal-day { display: grid; gap: 4px; }
+.cal-day h3 { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); font-family: var(--font-body); padding: 6px 6px 2px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; }
+details summary { cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="side" aria-label="Main">
+    <div class="brand" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 32 32"><circle cx="16" cy="14" r="10" fill="none" stroke="var(--accent)" stroke-width="3"/><path d="M13 9.5l7 4.5-7 4.5z" fill="var(--accent)"/><path d="M7 25q9 5 18 0" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/></svg>ReelNest</div>
+    <div id="side-tabs"></div>
+    <div class="foot" id="side-foot"></div>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="Main"></nav>
+<div id="overlay"></div>
+<div id="toast-root" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script>
+"use strict";
+/* ======================================================================
+   ReelNest web — private movie, TV and anime tracker.
+   Versioned backup format: reelnest-export v1.
+   ====================================================================== */
+
+// ---------- utilities ----------
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "x" + Math.random().toString(36).slice(2) + Date.now().toString(36));
+const now = () => Date.now();
+const pad = (n) => String(n).padStart(2, "0");
+const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => isoOf(new Date());
+const addDays = (iso, n) => { const [y, m, d] = iso.split("-").map(Number); return isoOf(new Date(y, m - 1, d + n)); };
+const validISO = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s + "T00:00:00"));
+const fmtDate = (iso) => {
+  if (!iso) return "Date unknown";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+};
+const relDay = (iso) => {
+  const t = today();
+  if (iso === t) return "Today";
+  if (iso === addDays(t, 1)) return "Tomorrow";
+  if (iso === addDays(t, -1)) return "Yesterday";
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const diff = (date - new Date(t + "T00:00:00")) / 86400000;
+  if (diff > 0 && diff < 7) return date.toLocaleDateString(undefined, { weekday: "long" });
+  return fmtDate(iso);
+};
+const dayOfMillis = (ms) => isoOf(new Date(ms));
+const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`);
+const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
+const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
+const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
+const storage = {
+  get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
+  del(k) { try { window.localStorage.removeItem(k); } catch {} },
+};
+
+// ---------- icons ----------
+const I = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  library: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="16" rx="1"/><path d="m17.5 5.2 3.4.9-3.6 14-3.4-.9"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  profile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+  sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+
+// ======================================================================
+//  Domain rules
+// ======================================================================
+const isSpecial = (e) => e.season === 0;
+const epCode = (e) => (isSpecial(e) ? `Special ${e.number}` : `S${pad(e.season)}E${pad(e.number)}`);
+const airState = (date, t) => (!date ? "unknown" : date > t ? "upcoming" : "aired");
+const epOrder = (a, b) => (isSpecial(a) - isSpecial(b)) || a.season - b.season || a.number - b.number;
+
+function progressOf(eps, watched, t, includeSpecials) {
+  let w = 0, total = 0, upcoming = 0, unknown = 0, spW = 0, spT = 0;
+  for (const e of eps) {
+    if (isSpecial(e)) { spT++; if (watched.has(e.id)) spW++; }
+    const a = airState(e.airDate, t);
+    if (a === "upcoming") upcoming++; else if (a === "unknown") unknown++;
+    if (a === "aired" && (!isSpecial(e) || includeSpecials)) { total++; if (watched.has(e.id)) w++; }
+  }
+  return { watched: w, total, upcoming, unknown, specialsWatched: spW, specialsTotal: spT, missing: total - w,
+    caughtUp: total > 0 && total === w, fraction: total ? w / total : 0 };
+}
+
+/** First unwatched episode after the furthest watched one. */
+function upNextOf(eps, watched, t, includeSpecials) {
+  const ordered = eps.filter((e) => !isSpecial(e) || includeSpecials).sort(epOrder);
+  if (!ordered.length) return { kind: "none" };
+  let last = -1;
+  ordered.forEach((e, i) => { if (watched.has(e.id)) last = i; });
+  const cand = ordered.slice(last + 1).find((e) => !watched.has(e.id));
+  if (!cand) return { kind: "caughtup" };
+  const a = airState(cand.airDate, t);
+  return { kind: a === "aired" ? "next" : a === "upcoming" ? "waiting" : "undated", ep: cand };
+}
+
+/** Mark-through plan: never future episodes; undated ones are opt-in; specials only for a special target. */
+function planThrough(eps, target, watched, t) {
+  const upTo = eps.slice().sort(epOrder).filter((e) => epOrder(e, target) <= 0).filter((e) => isSpecial(e) === isSpecial(target));
+  const already = upTo.filter((e) => watched.has(e.id)).length;
+  const mark = [], future = [], unknown = [];
+  for (const e of upTo.filter((e) => !watched.has(e.id))) {
+    const a = airState(e.airDate, t);
+    if (a === "aired") mark.push(e);
+    else if (a === "upcoming") future.push(e);
+    else if (e.id === target.id) mark.push(e);
+    else unknown.push(e);
+  }
+  return { mark, future, unknown, already };
+}
+function planSeason(eps, season, watched, t) {
+  const inS = eps.filter((e) => e.season === season).sort(epOrder);
+  const pending = inS.filter((e) => !watched.has(e.id));
+  return {
+    mark: pending.filter((e) => airState(e.airDate, t) === "aired"),
+    future: pending.filter((e) => airState(e.airDate, t) === "upcoming"),
+    unknown: pending.filter((e) => airState(e.airDate, t) === "unknown"),
+    already: inS.length - pending.length,
+  };
+}
+
+// Merge rules (used by import): per-field newest-wins with a device tie-break; events: union, deletion wins.
+const FIELDS = [["interest", "interestAt"], ["status", "statusAt"], ["watchlist", "watchlistAt"], ["rating", "ratingAt"], ["notes", "notesAt"]];
+const newer = (aAt, aDev, bAt, bDev) => aAt > bAt || (aAt === bAt && (aDev || "") > (bDev || ""));
+function mergeState(local, remote, since = 0) {
+  const out = { ...local };
+  const conflicts = [];
+  for (const [f, at] of FIELDS) {
+    if (newer(remote[at] || 0, remote.deviceId, local[at] || 0, local.deviceId)) { out[f] = remote[f]; out[at] = remote[at]; }
+  }
+  // Only a real conflict when both sides wrote notes since the last successful sync; the losing text is kept for review.
+  if (local.notes && remote.notes && local.notes !== remote.notes && (local.notesAt || 0) > since && (remote.notesAt || 0) > since)
+    conflicts.push({ workId: local.workId, kind: "notes", detail: out.notes === local.notes ? remote.notes : local.notes });
+  return { state: out, conflicts };
+}
+function mergeEvent(a, b) {
+  const del = [a.deletedAt, b.deletedAt].filter((x) => x != null);
+  return { ...a, deletedAt: del.length ? Math.min(...del) : null };
+}
+
+// ======================================================================
+//  State + persistence
+// ======================================================================
+const DEFAULT_SETTINGS = { theme: "system", includeSpecials: false, hideSpoilers: true, grid: true, lang: "en-US", region: "IN" };
+// Viewing region: where YOU watch (availability, certifications). Never confused with a title's country of origin.
+const REGIONS = ["IN", "US", "GB", "CA", "AU", "AE", "SG", "MY", "JP", "KR", "DE", "FR", "ES", "IT", "NL", "BR", "MX", "ID", "PH", "TH", "BD", "LK", "NP", "PK", "ZA", "NZ", "IE", "SA"];
+const region = () => (S.settings.region || "IN").toUpperCase();
+const S = {
+  works: {},     // id -> work
+  seasons: {},   // workId -> [season]
+  episodes: {},  // workId -> [episode]
+  states: {},    // workId -> state   (exists <=> in library)
+  events: {},    // id -> watch event (append-only; deletedAt marks removal)
+  tombs: {},     // workId -> tombstone
+  conflicts: [], // items to review
+  settings: { ...DEFAULT_SETTINGS },
+  settingsAt: 0, // when preferences last changed (for cloud merge)
+};
+const UI = {
+  watch: {}, link: null,
+  tab: "home", detail: null, openSeasons: {}, menu: null, modal: null, loading: true, loadNote: null, saveError: null,
+  lib: { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null, sort: "updated" },
+  disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null },
+  reveal: {},
+};
+const DEVICE = (() => { const k = "reelnest.device"; let d = storage.get(k); if (!d) { d = "web-" + uuid().slice(0, 8); storage.set(k, d); } return d; })();
+
+const Persist = {
+  mode: "starting", // cloud | local | memory
+  db: null, col: null, dirty: new Set(), meta: false, timer: null, flushing: false,
+
+  async init() {
+    // Inside Claude the runtime may attach window.claude slightly after this script runs.
+    for (let i = 0; i < 15 && IN_SANDBOX && !(window.claude && window.claude.use); i++) await new Promise((r) => setTimeout(r, 100));
+    const hasClaude = !!(window.claude && typeof window.claude.use === "function");
+    if (hasClaude) {
+      try {
+        const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+        const id = user ? await user.id() : null;
+        if (db && id) {
+          this.db = db; this.col = db.collection("data/users/" + id); this.mode = "cloud";
+          return this.subscribe();
+        }
+      } catch (e) { /* fall through to local */ }
+    }
+    this.mode = storage.set("reelnest.probe", "1") ? "local" : "memory";
+    const raw = storage.get("reelnest.web.v1");
+    if (raw) { try { Object.assign(S, JSON.parse(raw)); S.settings = { ...DEFAULT_SETTINGS, ...S.settings }; } catch {} }
+    UI.loading = false; applyTheme(); render();
+  },
+
+  subscribe() {
+    const timer = setTimeout(() => { if (UI.loading) { UI.loading = false; UI.loadNote = "Your saved library hasn't loaded yet. Changes you make now will save once the connection returns."; render(); } }, 10000);
+    this.col.onSnapshot((snap) => {
+      for (const d of snap.docs) {
+        if (this.dirty.has(d.id) || (d.id === "meta" && this.meta)) continue;
+        const v = d.data();
+        if (!v) continue;
+        if (d.id === "meta") {
+          S.settings = { ...DEFAULT_SETTINGS, ...(v.settings || {}) };
+          S.tombs = {}; for (const t of v.tombstones || []) S.tombs[t.entityId] = t;
+          S.conflicts = v.conflicts || [];
+        } else {
+          loadWorkDoc(v);
+        }
+      }
+      for (const ch of snap.docChanges()) if (ch.type === "removed" && ch.doc.id !== "meta" && !this.dirty.has(ch.doc.id)) dropWork(ch.doc.id);
+      if (!snap.metadata.fromCache) { clearTimeout(timer); UI.loadNote = null; }
+      UI.loading = false; applyTheme(); render();
+    }, (err) => {
+      clearTimeout(timer); UI.loading = false;
+      UI.loadNote = "Couldn't reach your saved library (" + (err && err.code || "error") + "). Reload the page to try again.";
+      render();
+    });
+  },
+
+  touch(workId) { if (workId) this.dirty.add(workId); if (workId) Sync.mark(workId); this.schedule(); },
+  touchMeta() { this.meta = true; Sync.markMeta(); this.schedule(); },
+  /** Save locally without queueing a cloud upload (used when applying data that came from the cloud). */
+  saveQuiet(ids) { for (const id of ids || []) this.dirty.add(id); this.meta = true; this.schedule(); },
+  schedule() { clearTimeout(this.timer); this.timer = setTimeout(() => this.flush(), 450); },
+
+  async flush() {
+    if (this.mode === "local" || this.mode === "memory") {
+      this.dirty.clear(); this.meta = false;
+      if (this.mode === "local" && !storage.set("reelnest.web.v1", JSON.stringify({ works: S.works, seasons: S.seasons, episodes: S.episodes, states: S.states, events: S.events, tombs: S.tombs, conflicts: S.conflicts, settings: S.settings, settingsAt: S.settingsAt }))) {
+        UI.saveError = "This browser refused to save (storage full or blocked). Export a backup from Profile."; render();
+      }
+      return;
+    }
+    if (this.mode !== "cloud" || this.flushing) return;
+    this.flushing = true;
+    try {
+      const ids = [...this.dirty];
+      for (const id of ids) {
+        const doc = workDoc(id);
+        try {
+          if (doc) await this.col.doc(id).set(doc); else await this.col.doc(id).delete();
+          this.dirty.delete(id);
+        } catch (e) { this.fail(e); }
+      }
+      if (this.meta) {
+        try {
+          await this.col.doc("meta").set({ settings: S.settings, tombstones: Object.values(S.tombs), conflicts: S.conflicts.slice(0, 50) });
+          this.meta = false;
+        } catch (e) { this.fail(e); }
+      }
+      if (!this.dirty.size && !this.meta && UI.saveError) { UI.saveError = null; render(); }
+    } finally {
+      this.flushing = false;
+      if (this.dirty.size || this.meta) this.timer = setTimeout(() => this.flush(), 4000);
+    }
+  },
+  fail(e) {
+    const code = e && e.code;
+    UI.saveError = code === "quota_exceeded" ? "Storage is full for this page. Export a backup and remove titles you no longer need."
+      : code === "invalid_argument" ? "This view can't save changes (read-only access)."
+      : "Couldn't save the latest change yet. Retrying automatically.";
+    render();
+  },
+};
+
+function workDoc(id) {
+  const w = S.works[id];
+  if (!w) return null;
+  return {
+    v: 1, work: w, seasons: S.seasons[id] || [], episodes: S.episodes[id] || [], state: S.states[id] || null,
+    events: Object.values(S.events).filter((e) => e.workId === id),
+  };
+}
+function loadWorkDoc(v) {
+  if (!v.work || !v.work.id) return;
+  const id = v.work.id;
+  S.works[id] = v.work; S.seasons[id] = v.seasons || []; S.episodes[id] = v.episodes || [];
+  if (v.state) S.states[id] = v.state; else delete S.states[id];
+  for (const e of Object.values(S.events)) if (e.workId === id) delete S.events[e.id];
+  for (const e of v.events || []) S.events[e.id] = e;
+}
+function dropWork(id) {
+  delete S.works[id]; delete S.seasons[id]; delete S.episodes[id]; delete S.states[id];
+  for (const e of Object.values(S.events)) if (e.workId === id) delete S.events[e.id];
+}
+
+// ======================================================================
+//  Repository (every user action; each returns an undo function)
+// ======================================================================
+const activeEvents = (workId) => Object.values(S.events).filter((e) => e.workId === workId && e.deletedAt == null);
+const watchedSet = (workId) => new Set(activeEvents(workId).map((e) => e.episodeId).filter(Boolean));
+const movieWatches = (workId) => activeEvents(workId).filter((e) => !e.episodeId).sort((a, b) => b.watchedAt - a.watchedAt);
+
+function ensureState(id) {
+  if (!S.states[id]) {
+    const t = now();
+    S.states[id] = { workId: id, interest: "UNCLASSIFIED", interestAt: t, status: "NOT_STARTED", statusAt: t, watchlist: false, watchlistAt: 0, rating: null, ratingAt: 0, notes: null, notesAt: 0, deviceId: DEVICE, addedAt: t };
+    if (S.tombs[id]) { delete S.tombs[id]; Persist.touchMeta(); }
+  }
+  return S.states[id];
+}
+function setField(id, field, value) {
+  const before = S.states[id] ? { ...S.states[id] } : null;
+  const s = ensureState(id);
+  s[field] = value; s[field + "At"] = now(); s.deviceId = DEVICE;
+  Persist.touch(id);
+  return () => {
+    if (!before) return removeInternal(id);
+    const t = now();
+    S.states[id] = { ...before, interestAt: t, statusAt: t, watchlistAt: t, ratingAt: t, notesAt: t, deviceId: DEVICE };
+    Persist.touch(id);
+  };
+}
+function markEpisodes(id, epIds, at = now()) {
+  const existed = !!S.states[id];
+  const s = ensureState(id);
+  const prevStatus = s.status;
+  const have = watchedSet(id);
+  const created = epIds.filter((e) => !have.has(e)).map((e) => ({ id: uuid(), workId: id, episodeId: e, watchedAt: at, isRewatch: false, createdAt: now(), deletedAt: null, deviceId: DEVICE }));
+  for (const e of created) S.events[e.id] = e;
+  if (s.status === "NOT_STARTED" && created.length) { s.status = "WATCHING"; s.statusAt = now(); }
+  Persist.touch(id);
+  return () => {
+    const t = now();
+    for (const e of created) S.events[e.id] = { ...e, deletedAt: t };
+    if (!existed) removeInternal(id);
+    else if (S.states[id] && S.states[id].status !== prevStatus) { S.states[id].status = prevStatus; S.states[id].statusAt = t; }
+    Persist.touch(id);
+  };
+}
+function unmarkEpisodes(id, epIds) {
+  const set = new Set(epIds);
+  const removed = activeEvents(id).filter((e) => e.episodeId && set.has(e.episodeId));
+  const t = now();
+  for (const e of removed) S.events[e.id] = { ...e, deletedAt: t };
+  Persist.touch(id);
+  return () => { for (const e of removed) { const c = { ...e, id: uuid(), createdAt: now(), deletedAt: null, deviceId: DEVICE }; S.events[c.id] = c; } Persist.touch(id); };
+}
+function addMovieWatch(id, dateIso, rewatch) {
+  ensureState(id);
+  const at = dateIso === today() ? now() : new Date(dateIso + "T12:00:00").getTime();
+  const e = { id: uuid(), workId: id, episodeId: null, watchedAt: at, isRewatch: !!rewatch, createdAt: now(), deletedAt: null, deviceId: DEVICE };
+  S.events[e.id] = e;
+  Persist.touch(id);
+  return () => { S.events[e.id] = { ...e, deletedAt: now() }; Persist.touch(id); };
+}
+function deleteEvent(evId) {
+  const e = S.events[evId];
+  if (!e) return () => {};
+  S.events[evId] = { ...e, deletedAt: now() };
+  Persist.touch(e.workId);
+  return () => { const c = { ...e, id: uuid(), createdAt: now(), deletedAt: null }; S.events[c.id] = c; Persist.touch(e.workId); };
+}
+function removeInternal(id) {
+  const t = now();
+  delete S.states[id];
+  for (const e of activeEvents(id)) S.events[e.id] = { ...e, deletedAt: t };
+  S.tombs[id] = { entityType: "work", entityId: id, deletedAt: t, deviceId: DEVICE };
+  Persist.touch(id); Persist.touchMeta();
+}
+function removeFromLibrary(id) {
+  const state = S.states[id] ? { ...S.states[id] } : null;
+  const evs = activeEvents(id).map((e) => ({ ...e }));
+  removeInternal(id);
+  return () => {
+    const t = now();
+    delete S.tombs[id];
+    if (state) S.states[id] = { ...state, interestAt: t, statusAt: t, watchlistAt: t, ratingAt: t, notesAt: t };
+    for (const e of evs) { const c = { ...e, id: uuid(), createdAt: t, deletedAt: null }; S.events[c.id] = c; }
+    Persist.touch(id); Persist.touchMeta();
+  };
+}
+function createManual(f) {
+  const id = "manual:" + uuid();
+  const t = now();
+  S.works[id] = {
+    id, type: f.type, isAnime: f.isAnime, title: f.title.trim(), originalTitle: f.originalTitle || null,
+    year: f.year || (f.releaseDate ? Number(f.releaseDate.slice(0, 4)) : null), overview: f.overview || null,
+    posterPath: null, backdropPath: null, genres: f.genres || [], originalLanguage: f.lang || null, countries: f.country ? [f.country] : [],
+    runtimeMinutes: f.runtime || null, releaseDate: f.releaseDate || null, seriesStatus: null, provider: null, providerId: null,
+    isManual: true, fetchedAt: null, createdAt: t, updatedAt: t, demo: !!f.demo,
+  };
+  S.episodes[id] = []; S.seasons[id] = [];
+  ensureState(id);
+  for (const [season, count] of f.seasons || []) addEpisodes(id, season, count, true);
+  Persist.touch(id);
+  return id;
+}
+function addEpisodes(id, season, count, silent) {
+  const eps = S.episodes[id] || (S.episodes[id] = []);
+  const start = eps.filter((e) => e.season === season).reduce((m, e) => Math.max(m, e.number), 0) + 1;
+  for (let n = start; n < start + count; n++) eps.push({ id: "manual-ep:" + uuid(), workId: id, season, number: n, title: null, airDate: null, runtimeMinutes: null, overview: null, providerId: null, isManual: true, updatedAt: now() });
+  const ss = S.seasons[id] || (S.seasons[id] = []);
+  if (!ss.some((s) => s.number === season)) ss.push({ workId: id, number: season, name: season === 0 ? "Specials" : `Season ${season}`, episodeCount: null, airDate: null });
+  if (!silent) Persist.touch(id);
+}
+
+// ======================================================================
+//  Catalog (TMDB). Works when this file is hosted on its own; the Claude
+//  artifact sandbox blocks outside requests and remote images.
+// ======================================================================
+const IN_SANDBOX = !!(window.claude && typeof window.claude.use === "function") || (() => { try { return window.self !== window.top; } catch { return true; } })();
+const Catalog = {
+  key() { return storage.get("reelnest.tmdbKey") || ""; },
+  relay() { return (storage.get("reelnest.tmdbRelay") || "").trim().replace(/\/+$/, ""); },
+  status() { return IN_SANDBOX ? "sandbox" : this.key() || this.relay() ? "ready" : "nokey"; },
+  // TMDB is blocked by some Indian ISPs (notably Jio). Try the official second hostname, then a user relay.
+  hosts() { const r = this.relay(); return r ? [r + "/3/"] : ["https://api.themoviedb.org/3/", "https://api.tmdb.org/3/"]; },
+  goodHost: null,
+  /** Every place a TMDB image can come from, best first. Some Indian networks block image.tmdb.org but not media.themoviedb.org. */
+  imgs(path, size = "w342") {
+    if (!path || IN_SANDBOX) return [];
+    const r = this.relay();
+    const src = `image.tmdb.org/t/p/${size}${path}`;
+    // Last resorts: wsrv.nl is a free open-source image cache that fetches from outside the blocked network.
+    const list = [`https://image.tmdb.org/t/p/${size}${path}`, `https://media.themoviedb.org/t/p/${size}${path}`,
+      `https://wsrv.nl/?url=${encodeURIComponent(src)}`, `https://images.weserv.nl/?url=${encodeURIComponent(src)}`];
+    if (r) list.unshift(`${r}/img/${size}${path}`);
+    const good = this.goodImgHost;
+    return good ? [...list.filter((u) => u.startsWith(good)), ...list.filter((u) => !u.startsWith(good))] : list;
+  },
+  img(path, size = "w342") { return this.imgs(path, size)[0] || null; },
+  goodImgHost: storage.get("reelnest.imgHost") || null,
+  async call(path, params = {}) {
+    const key = this.key();
+    const hosts = this.hosts();
+    const order = this.goodHost && hosts.includes(this.goodHost) ? [this.goodHost, ...hosts.filter((h) => h !== this.goodHost)] : hosts;
+    let res = null;
+    for (const host of order) {
+      const url = new URL(host + path);
+      const headers = { Accept: "application/json" };
+      if (key) { if (key.startsWith("eyJ")) headers.Authorization = "Bearer " + key; else url.searchParams.set("api_key", key); }
+      for (const [k, v] of Object.entries(params)) if (v !== null && v !== undefined && v !== "") url.searchParams.set(k, v);
+      try {
+        const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 9000);
+        res = await fetch(url, { headers, signal: ctrl.signal });
+        clearTimeout(timer);
+        this.goodHost = host;
+        break;
+      } catch (e) { res = null; /* blocked, reset or timed out: try the next host */ }
+    }
+    if (!res) throw { code: navigator.onLine === false ? "offline" : this.relay() ? "relay" : "blocked" };
+    if (res.status === 401 || res.status === 403) throw { code: "unauthorized" };
+    if (res.status === 404) throw { code: "notfound" };
+    if (res.status === 429) throw { code: "ratelimited" };
+    if (!res.ok) throw { code: "server" };
+    return res.json();
+  },
+  message(code) {
+    return ({
+      sandbox: "Live catalog search is switched off inside Claude, because pages here can't contact outside services. Host this same file yourself to search TMDB, or add titles manually.",
+      nokey: "Add your free TMDB API key (or your relay address) in Profile to search the catalog. Manual entry works without it.",
+      offline: "You're offline. Your library still works.",
+      network: "Couldn't reach TMDB. Check your connection and try again.",
+      blocked: "Couldn't reach TMDB. Some Indian networks (Jio especially) block it. Set up the free relay in Profile › Catalog, or switch your phone's Private DNS to dns.google.",
+      relay: "Couldn't reach your catalog relay. Check its address in Profile › Catalog.",
+      unauthorized: "TMDB rejected the API key. Check it in Profile.",
+      ratelimited: "TMDB is limiting requests right now. Try again in a moment.",
+      notfound: "TMDB no longer has this entry.",
+      server: "TMDB had a problem answering.",
+    })[code] || "Something went wrong talking to TMDB.";
+  },
+  date(s) { return s && validISO(s) ? s : null; },
+  item(r, forced) {
+    const type = forced || (r.media_type === "movie" ? "MOVIE" : r.media_type === "tv" ? "SERIES" : null);
+    if (!type) return null;
+    const title = type === "MOVIE" ? r.title || r.original_title : r.name || r.original_name;
+    if (!title) return null;
+    const orig = type === "MOVIE" ? r.original_title : r.original_name;
+    const d = this.date(type === "MOVIE" ? r.release_date : r.first_air_date);
+    return { key: `tmdb:${type.toLowerCase()}:${r.id}`, type, providerId: String(r.id), title, originalTitle: orig && orig !== title ? orig : null,
+      year: d ? Number(d.slice(0, 4)) : null, posterPath: r.poster_path, lang: r.original_language, countries: r.origin_country || [],
+      genreIds: r.genre_ids || [], anime: (r.genre_ids || []).includes(16) && r.original_language === "ja" };
+  },
+  async details(item) {
+    const id = item.key, lang = S.settings.lang;
+    if (item.type === "MOVIE") {
+      const m = await this.call("movie/" + item.providerId, { language: lang, append_to_response: "credits,alternative_titles,release_dates,videos", include_video_language: "en,hi,null" });
+      const d = this.date(m.release_date);
+      return { work: { id, type: "MOVIE", isAnime: (m.genres || []).some((g) => g.id === 16) && m.original_language === "ja", title: m.title || m.original_title,
+        originalTitle: m.original_title, year: d ? +d.slice(0, 4) : null, overview: m.overview || null, posterPath: m.poster_path, backdropPath: m.backdrop_path,
+        genres: (m.genres || []).map((g) => g.name), originalLanguage: m.original_language,
+        countries: [...new Set([...(m.origin_country || []), ...(m.production_countries || []).map((c) => c.iso_3166_1)])],
+        runtimeMinutes: m.runtime || null, releaseDate: d, seriesStatus: m.status, provider: "tmdb", providerId: item.providerId, isManual: false,
+        fetchedAt: now(), createdAt: now(), updatedAt: now(), cast: (m.credits?.cast || []).slice(0, 12).map((c) => c.name),
+        altTitles: [...new Set((m.alternative_titles?.titles || []).map((x) => x.title))].slice(0, 20), extra: this.extra(m, "MOVIE") }, seasons: [] };
+    }
+    const t = await this.call("tv/" + item.providerId, { language: lang, append_to_response: "credits,alternative_titles,content_ratings,videos,external_ids", include_video_language: "en,hi,null" });
+    const d = this.date(t.first_air_date);
+    return { work: { id, type: "SERIES", isAnime: (t.genres || []).some((g) => g.id === 16) && t.original_language === "ja", title: t.name || t.original_name,
+      originalTitle: t.original_name, year: d ? +d.slice(0, 4) : null, overview: t.overview || null, posterPath: t.poster_path, backdropPath: t.backdrop_path,
+      genres: (t.genres || []).map((g) => g.name), originalLanguage: t.original_language, countries: t.origin_country || [],
+      runtimeMinutes: (t.episode_run_time || []).find((x) => x > 0) || null, releaseDate: d, seriesStatus: t.status, provider: "tmdb", providerId: item.providerId,
+      isManual: false, fetchedAt: now(), createdAt: now(), updatedAt: now(), cast: (t.credits?.cast || []).slice(0, 12).map((c) => c.name),
+      altTitles: [...new Set((t.alternative_titles?.results || []).map((x) => x.title))].slice(0, 20), extra: this.extra(t, "SERIES") },
+      seasons: (t.seasons || []).map((s) => ({ workId: id, number: s.season_number, name: s.name, episodeCount: s.episode_count, airDate: this.date(s.air_date) })) };
+  },
+  /** Extra display-only metadata. Region for certification and streaming is India, falling back to US. */
+  extra(d, type) {
+    // Certifications for every country TMDB lists; the viewing region picks one at display time.
+    const certs = {};
+    if (type === "MOVIE") for (const r of d.release_dates?.results || []) { const v = (r.release_dates || []).map((x) => x.certification).find(Boolean); if (v) certs[r.iso_3166_1] = v; }
+    else for (const r of d.content_ratings?.results || []) if (r.rating) certs[r.iso_3166_1] = r.rating;
+    const vids = (d.videos?.results || []).filter((v) => v.site === "YouTube");
+    const trailer = vids.find((v) => v.type === "Trailer" && v.official) || vids.find((v) => v.type === "Trailer") || vids.find((v) => v.type === "Teaser");
+    const crew = d.credits?.crew || [];
+    return {
+      tagline: d.tagline || null,
+      score: d.vote_count ? Math.round(d.vote_average * 10) / 10 : null, votes: d.vote_count || 0,
+      status: d.status || null,
+      certs,
+      people: type === "MOVIE" ? crew.filter((c) => c.job === "Director").map((c) => c.name).slice(0, 3) : (d.created_by || []).map((c) => c.name).slice(0, 3),
+      peopleLabel: type === "MOVIE" ? "Directed by" : "Created by",
+      writers: type === "MOVIE" ? [...new Set(crew.filter((c) => c.department === "Writing").map((c) => c.name))].slice(0, 3) : [],
+      music: [...new Set(crew.filter((c) => c.job === "Original Music Composer" || c.job === "Music").map((c) => c.name))].slice(0, 2),
+      companies: type === "MOVIE" ? (d.production_companies || []).map((c) => c.name).slice(0, 3) : (d.networks || []).map((c) => c.name).slice(0, 3),
+      companiesLabel: type === "MOVIE" ? "Studio" : "Network",
+      seasons: d.number_of_seasons || null, episodes: d.number_of_episodes || null,
+      lastAir: this.date(d.last_air_date), nextEp: d.next_episode_to_air ? { s: d.next_episode_to_air.season_number, e: d.next_episode_to_air.episode_number, date: this.date(d.next_episode_to_air.air_date), name: d.next_episode_to_air.name } : null,
+      budget: d.budget || null, revenue: d.revenue || null,
+      imdb: d.imdb_id || d.external_ids?.imdb_id || null,
+      trailer: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
+      origCountry: d.origin_country || [],
+    };
+  },
+  async season(work, n) {
+    const r = await this.call(`tv/${work.providerId}/season/${n}`, { language: S.settings.lang });
+    return (r.episodes || []).map((e) => ({ id: "tmdb:ep:" + e.id, workId: work.id, season: e.season_number, number: e.episode_number,
+      title: e.name || null, airDate: this.date(e.air_date), runtimeMinutes: e.runtime || null, overview: e.overview || null,
+      providerId: String(e.id), isManual: false, updatedAt: now() }));
+  },
+};
+async function openCatalogItem(item) {
+  const cached = S.works[item.key];
+  if (cached && cached.fetchedAt > now() - 7 * 864e5 && cached.extra) return item.key;
+  try {
+    const d = await Catalog.details(item);
+    S.works[item.key] = { ...d.work, createdAt: cached?.createdAt || d.work.createdAt, isAnime: cached ? cached.isAnime : d.work.isAnime };
+    const old = Object.fromEntries((S.seasons[item.key] || []).map((s) => [s.number, s]));
+    S.seasons[item.key] = d.seasons.map((s) => ({ ...s, fetchedAt: old[s.number]?.fetchedAt || null }));
+    if (S.states[item.key]) Persist.touch(item.key);
+    return item.key;
+  } catch (e) {
+    if (cached) return item.key;
+    throw e;
+  }
+}
+async function ensureEpisodes(id, force) {
+  const w = S.works[id];
+  if (!w || w.isManual || w.type !== "SERIES" || Catalog.status() !== "ready") return null;
+  const yearAgo = addDays(today(), -365);
+  let err = null;
+  for (const s of S.seasons[id] || []) {
+    const stale = !s.fetchedAt || (s.fetchedAt < now() - 864e5 && (!s.airDate || s.airDate > yearAgo));
+    if (!force && !stale) continue;
+    try {
+      const eps = await Catalog.season(w, s.number);
+      const keep = (S.episodes[id] || []).filter((e) => !eps.some((n) => n.id === e.id));
+      S.episodes[id] = [...keep, ...eps];
+      s.fetchedAt = now();
+    } catch (e) { err = e; }
+  }
+  if (S.states[id]) Persist.touch(id);
+  return err;
+}
+
+// ======================================================================
+//  Cloud backup & sync (Supabase). Optional. Local use never needs an account.
+//  Server rules live in supabase/schema.sql (per-user Row Level Security).
+// ======================================================================
+const CloudCfg = {
+  url() { return ((storage.get("reelnest.sbUrl") || (window.REELNEST_CONFIG || {}).supabaseUrl || "") + "").trim().replace(/\/+$/, ""); },
+  key() { return ((storage.get("reelnest.sbKey") || (window.REELNEST_CONFIG || {}).supabaseAnonKey || "") + "").trim(); },
+  google() { return !!(window.REELNEST_CONFIG || {}).googleSignIn; },
+  configured() { return !IN_SANDBOX && !!(this.url() && this.key()); },
+};
+const camelState = (r) => ({ workId: r.work_id, interest: r.interest, interestAt: +r.interest_at, status: r.status, statusAt: +r.status_at, watchlist: !!r.watchlist,
+  watchlistAt: +r.watchlist_at, rating: r.rating ?? null, ratingAt: +r.rating_at, notes: r.notes ?? null, notesAt: +r.notes_at, deviceId: r.device_id || "", addedAt: +r.added_at || 0 });
+const snakeState = (s) => ({ work_id: s.workId, interest: s.interest, interest_at: s.interestAt || 0, status: s.status, status_at: s.statusAt || 0, watchlist: !!s.watchlist,
+  watchlist_at: s.watchlistAt || 0, rating: s.rating ?? null, rating_at: s.ratingAt || 0, notes: s.notes ?? null, notes_at: s.notesAt || 0, device_id: s.deviceId || DEVICE, added_at: s.addedAt || 0 });
+const camelEvent = (r) => ({ id: r.id, workId: r.work_id, episodeId: r.episode_id ?? null, watchedAt: +r.watched_at, isRewatch: !!r.is_rewatch, createdAt: +r.created_at, deletedAt: r.deleted_at == null ? null : +r.deleted_at, deviceId: r.device_id || "" });
+const snakeEvent = (e) => ({ id: e.id, work_id: e.workId, episode_id: e.episodeId ?? null, watched_at: e.watchedAt, is_rewatch: !!e.isRewatch, created_at: e.createdAt, deleted_at: e.deletedAt ?? null, device_id: e.deviceId || DEVICE });
+const lastEdit = (st) => Math.max(...FIELDS.map(([, a]) => st[a] || 0));
+
+const Sync = {
+  session: (() => { try { return JSON.parse(storage.get("reelnest.session") || "null"); } catch { return null; } })(),
+  outbox: (() => { try { return JSON.parse(storage.get("reelnest.outbox") || "{}"); } catch { return {}; } })(), // id -> version, "__meta" for settings
+  lastOk: +(storage.get("reelnest.lastSync") || 0),
+  lastRev: +(storage.get("reelnest.lastRev") || 0),
+  linkedUser: storage.get("reelnest.syncUser") || null,
+  phase: "idle", error: null, timer: null, failures: 0, applying: false, auth: { step: "email", email: "", busy: false, msg: null },
+
+  signedIn() { return !!(this.session && this.session.access_token && this.session.user); },
+  active() { return CloudCfg.configured() && this.signedIn() && this.linkedUser === this.session.user.id; },
+  pending() { return Object.keys(this.outbox).length; },
+  saveOutbox() { storage.set("reelnest.outbox", JSON.stringify(this.outbox)); },
+  mark(id) { if (this.applying || !this.active()) return; this.outbox[id] = (this.outbox[id] || 0) + 1; this.saveOutbox(); this.schedule(2500); },
+  markMeta() { this.mark("__meta"); },
+  markAll() { for (const id of Object.keys(S.works)) this.outbox[id] = (this.outbox[id] || 0) + 1; this.outbox.__meta = 1; this.saveOutbox(); },
+  schedule(ms) { if (!this.active()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.run(), ms); },
+
+  // ---------- HTTP ----------
+  async http(path, opts = {}, authed = true) {
+    const headers = { apikey: CloudCfg.key(), "Content-Type": "application/json", ...(opts.headers || {}) };
+    if (authed && this.session) headers.Authorization = "Bearer " + this.session.access_token;
+    let res;
+    try { res = await fetch(CloudCfg.url() + path, { ...opts, headers }); }
+    catch { throw { code: navigator.onLine === false ? "offline" : "network" }; }
+    let body = null;
+    try { body = await res.json(); } catch {}
+    if (!res.ok) throw { code: res.status === 401 ? "auth" : res.status === 429 ? "ratelimited" : res.status >= 500 ? "server" : "request", status: res.status,
+      message: (body && (body.msg || body.message || body.error_description || body.error)) || "" };
+    return body;
+  },
+  async refresh() {
+    if (!this.session || !this.session.refresh_token) throw { code: "auth" };
+    const r = await this.http("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: this.session.refresh_token }) }, false);
+    this.setSession(r);
+  },
+  async rpc(name, args) {
+    if (this.session && this.session.expires_at && this.session.expires_at < now() + 60e3) await this.refresh();
+    try { return await this.http(`/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(args) }); }
+    catch (e) { if (e.code !== "auth") throw e; await this.refresh(); return this.http(`/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(args) }); }
+  },
+  setSession(r) {
+    const user = r.user ? { id: r.user.id, email: r.user.email } : this.session && this.session.user;
+    this.session = { access_token: r.access_token, refresh_token: r.refresh_token || (this.session && this.session.refresh_token), expires_at: now() + (r.expires_in || 3600) * 1000, user };
+    storage.set("reelnest.session", JSON.stringify(this.session));
+  },
+  message(e) {
+    return ({ offline: "You're offline. Changes are kept on this device and will upload when you're back online.",
+      network: "Couldn't reach the cloud server. Free Supabase projects pause after a week without use; if that happened, restore it from the Supabase dashboard.",
+      auth: "Your sign-in expired. Sign in again to resume backup. Nothing on this device was lost.",
+      ratelimited: "The server is limiting requests. ReelNest will retry shortly.",
+      server: "The cloud server had a problem. ReelNest will retry.",
+    })[e.code] || ("Sync failed" + (e.message ? `: ${e.message}` : "."));
+  },
+
+  // ---------- sign-in ----------
+  async sendCode(email) {
+    await this.http("/auth/v1/otp", { method: "POST", body: JSON.stringify({ email, create_user: true }) }, false);
+  },
+  async verifyCode(email, token) {
+    const r = await this.http("/auth/v1/verify", { method: "POST", body: JSON.stringify({ type: "email", email, token }) }, false);
+    this.setSession(r);
+    await this.afterSignIn();
+  },
+  googleUrl() { return `${CloudCfg.url()}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`; },
+  /** Magic-link and Google sign-in return tokens in the URL fragment. */
+  async consumeRedirect() {
+    const h = location.hash.slice(1);
+    if (!h.includes("access_token=")) return false;
+    const p = new URLSearchParams(h);
+    history.replaceState(null, "", location.pathname + "#profile");
+    UI.tab = "profile";
+    this.session = { access_token: p.get("access_token"), refresh_token: p.get("refresh_token"), expires_at: now() + (+p.get("expires_in") || 3600) * 1000, user: null };
+    try {
+      const u = await this.http("/auth/v1/user");
+      this.setSession({ access_token: this.session.access_token, refresh_token: this.session.refresh_token, expires_in: (this.session.expires_at - now()) / 1000, user: u });
+      await this.afterSignIn();
+    } catch (e) { this.session = null; storage.del("reelnest.session"); toast("Sign-in didn't complete. Please try again."); }
+    return true;
+  },
+  async signOut() {
+    try { await this.http("/auth/v1/logout", { method: "POST" }); } catch {}
+    this.session = null; storage.del("reelnest.session");
+    this.linkedUser = null; storage.del("reelnest.syncUser");
+    this.outbox = {}; this.saveOutbox(); this.lastRev = 0; storage.del("reelnest.lastRev"); this.lastOk = 0; storage.del("reelnest.lastSync");
+    this.phase = "idle"; this.error = null; render();
+  },
+
+  /** First sign-in on this device: look at both copies and offer a merge. Nothing is replaced. */
+  async afterSignIn() {
+    if (this.linkedUser === this.session.user.id) { this.run(); return; }
+    let cloud;
+    try { cloud = await this.rpc("rn_pull", { since: 0 }); }
+    catch (e) { this.error = this.message(e); render(); return; }
+    const cloudIds = new Set((cloud.states || []).map((s) => s.work_id));
+    const localIds = new Set(Object.keys(S.states));
+    const both = [...localIds].filter((i) => cloudIds.has(i)).length;
+    if (!localIds.size) { await this.link(cloud, false); toast(cloudIds.size ? `Restored ${cloudIds.size} titles from your cloud backup` : "Cloud backup is on"); return; }
+    openModal({ type: "sync-merge", cloud, local: localIds.size, remote: cloudIds.size, both, email: this.session.user.email });
+  },
+  async link(cloud, uploadLocal) {
+    this.linkedUser = this.session.user.id; storage.set("reelnest.syncUser", this.linkedUser);
+    this.lastRev = 0; storage.set("reelnest.lastRev", "0");
+    this.applyPull(cloud);
+    if (uploadLocal) this.markAll();
+    await this.run();
+  },
+
+  // ---------- the sync cycle: pull + merge, then push, then acknowledge ----------
+  async run() {
+    if (!this.active() || this.phase === "syncing") return;
+    clearTimeout(this.timer);
+    this.phase = "syncing"; render();
+    try {
+      const pulled = await this.rpc("rn_pull", { since: Math.max(0, this.lastRev - 50) });
+      this.applyPull(pulled);
+      const snapshot = { ...this.outbox };
+      const ids = Object.keys(snapshot);
+      if (ids.length) {
+        await this.rpc("rn_push", { payload: this.payload(ids) });
+        for (const id of ids) if (this.outbox[id] === snapshot[id]) delete this.outbox[id]; // edits made during the push stay queued
+        this.saveOutbox();
+      }
+      this.lastRev = Math.max(this.lastRev, +pulled.rev || 0); storage.set("reelnest.lastRev", String(this.lastRev));
+      this.lastOk = now(); storage.set("reelnest.lastSync", String(this.lastOk)); // only after the server confirmed
+      this.phase = "idle"; this.error = null; this.failures = 0;
+      if (this.pending()) this.schedule(1500);
+    } catch (e) {
+      this.phase = "error"; this.error = this.message(e); this.failures++;
+      if (e.code === "auth") { this.session = null; storage.del("reelnest.session"); }
+      else this.schedule([5e3, 15e3, 60e3, 300e3][Math.min(this.failures - 1, 3)]);
+    }
+    render();
+  },
+
+  payload(ids) {
+    const p = { works: [], episodes: [], states: [], events: [], tombstones: [] };
+    for (const id of ids) {
+      if (id === "__meta") { p.settings = { body: S.settings, updated_at: S.settingsAt || 1 }; continue; }
+      const w = S.works[id];
+      if (w) {
+        // Season "fetched" times are per device: each device downloads its own episode lists.
+        p.works.push({ id, body: { ...w, _seasons: (S.seasons[id] || []).map(({ fetchedAt, ...x }) => x) }, updated_at: w.updatedAt || w.createdAt || 1 });
+        for (const e of S.episodes[id] || []) if (e.isManual) p.episodes.push({ id: e.id, work_id: id, body: e, updated_at: e.updatedAt || 1, deleted: false });
+      }
+      if (S.states[id]) p.states.push(snakeState(S.states[id]));
+      for (const e of Object.values(S.events)) if (e.workId === id) p.events.push(snakeEvent(e));
+      if (S.tombs[id]) p.tombstones.push({ entity_type: "work", entity_id: id, deleted_at: S.tombs[id].deletedAt, device_id: S.tombs[id].deviceId || DEVICE });
+    }
+    return p;
+  },
+
+  /** Merge server data into this device without queueing it back up (no echo). */
+  applyPull(r) {
+    this.applying = true;
+    const touched = new Set();
+    try {
+      for (const row of r.works || []) {
+        const local = S.works[row.id];
+        if (!local || +row.updated_at > (local.updatedAt || 0)) {
+          const { _seasons, ...w } = row.body || {};
+          if (!w.id) continue;
+          S.works[row.id] = { ...(local || {}), ...w };
+          if (_seasons && _seasons.length) {
+            const mineS = Object.fromEntries((S.seasons[row.id] || []).map((x) => [x.number, x]));
+            S.seasons[row.id] = _seasons.map(({ fetchedAt, ...x }) => ({ ...x, fetchedAt: mineS[x.number]?.fetchedAt || null }));
+          }
+          if (!S.episodes[row.id]) S.episodes[row.id] = [];
+          touched.add(row.id);
+        }
+      }
+      for (const row of r.episodes || []) {
+        const list = S.episodes[row.work_id] || (S.episodes[row.work_id] = []);
+        const i = list.findIndex((e) => e.id === row.id);
+        if (row.deleted) { if (i >= 0) list.splice(i, 1); }
+        else if (i < 0) list.push(row.body);
+        else if (+row.updated_at > (list[i].updatedAt || 0)) list[i] = row.body;
+        touched.add(row.work_id);
+      }
+      for (const row of r.events || []) {
+        const e = camelEvent(row), mine = S.events[e.id];
+        S.events[e.id] = mine ? mergeEvent(mine, e) : e;
+        touched.add(e.workId);
+      }
+      for (const row of r.states || []) {
+        const remote = camelState(row), id = remote.workId, mine = S.states[id], tomb = S.tombs[id];
+        if (!mine && tomb && tomb.deletedAt >= lastEdit(remote)) continue; // deleted here after that edit
+        if (!mine) { S.states[id] = remote; if (tomb) delete S.tombs[id]; }
+        else {
+          const m = mergeState(mine, remote, this.lastOk);
+          const added = [mine.addedAt, remote.addedAt].filter((x) => x > 0);
+          S.states[id] = { ...m.state, addedAt: added.length ? Math.min(...added) : 0 };
+          S.conflicts = [...m.conflicts, ...S.conflicts].slice(0, 50);
+        }
+        touched.add(id);
+      }
+      for (const row of r.tombstones || []) {
+        if (row.entity_type !== "work") continue;
+        const id = row.entity_id, mine = S.states[id];
+        if (mine && lastEdit(mine) > +row.deleted_at) {
+          S.conflicts.unshift({ workId: id, kind: "edited_after_delete", detail: `“${S.works[id]?.title || "A title"}” was removed on another device, then changed here, so it was kept.` });
+          this.applying = false; this.mark(id); this.applying = true;
+          continue;
+        }
+        delete S.states[id];
+        for (const e of Object.values(S.events)) if (e.workId === id && e.deletedAt == null) S.events[e.id] = { ...e, deletedAt: +row.deleted_at };
+        S.tombs[id] = { entityType: "work", entityId: id, deletedAt: +row.deleted_at, deviceId: row.device_id };
+        touched.add(id);
+      }
+      if (r.settings && +r.settings.updated_at > (S.settingsAt || 0)) {
+        S.settings = { ...DEFAULT_SETTINGS, ...(r.settings.body || {}) }; S.settingsAt = +r.settings.updated_at; applyTheme();
+      }
+    } finally { this.applying = false; }
+    Persist.saveQuiet([...touched]);
+  },
+
+  async deleteCloud() {
+    await this.rpc("rn_delete_my_data", {});
+    this.lastRev = 0; storage.set("reelnest.lastRev", "0");
+  },
+};
+window.addEventListener("online", () => Sync.schedule(500));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") Sync.schedule(800); });
+setInterval(() => { if (document.visibilityState === "visible") Sync.schedule(0); }, 120e3);
+
+// ======================================================================
+//  Derived data
+// ======================================================================
+function library() {
+  return Object.keys(S.states).filter((id) => S.works[id]).map((id) => {
+    const w = S.works[id], st = S.states[id], ev = activeEvents(id);
+    return { w, st, eps: S.episodes[id] || [], watched: new Set(ev.map((e) => e.episodeId).filter(Boolean)), movies: ev.filter((e) => !e.episodeId),
+      last: Math.max(st.addedAt || 0, ...FIELDS.map(([, a]) => st[a] || 0), ...ev.map((e) => e.createdAt)) };
+  });
+}
+const followed = (x) => x.st.status === "WATCHING" || (x.st.status === "NOT_STARTED" && (x.st.watchlist || x.watched.size > 0))
+  || (x.st.status === "COMPLETED" && x.w.type === "SERIES" && /returning|production/i.test(x.w.seriesStatus || ""));
+function upcoming(lib, days) {
+  const t = today(), end = days ? addDays(t, days) : null, out = [];
+  for (const x of lib) {
+    if (!followed(x)) continue;
+    if (x.w.type === "SERIES") {
+      for (const e of x.eps) if (e.airDate && e.airDate >= t && (!end || e.airDate <= end) && !x.watched.has(e.id)) out.push({ date: e.airDate, x, e });
+    } else if (x.w.releaseDate && x.w.releaseDate >= t && (!end || x.w.releaseDate <= end) && !x.movies.length) out.push({ date: x.w.releaseDate, x, e: null });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.x.w.title.localeCompare(b.x.w.title) || (a.e && b.e ? epOrder(a.e, b.e) : 0));
+}
+
+// ======================================================================
+//  Rendering helpers
+// ======================================================================
+/** <img> that walks through fallback hosts on error and remembers the first host that works. */
+function imgTag(urls, cls) {
+  if (!urls.length) return "";
+  return `<img class="${cls}" src="${esc(urls[0])}" data-alts="${esc(urls.slice(1).join("|"))}" alt="" loading="lazy" onerror="imgFail(this)" onload="imgOk(this)">`;
+}
+window.imgFail = (el) => { const rest = (el.dataset.alts || "").split("|").filter(Boolean); if (rest.length) { el.dataset.alts = rest.slice(1).join("|"); el.src = rest[0]; } else el.remove(); };
+window.imgOk = (el) => { try { const host = new URL(el.src).origin; if (Catalog.goodImgHost !== host) { Catalog.goodImgHost = host; storage.set("reelnest.imgHost", host); } } catch {} };
+function poster(w, extra = "") {
+  const hue = hashHue(w.title + w.id);
+  const bg = `linear-gradient(160deg, hsl(${hue} 46% 38%), hsl(${(hue + 40) % 360} 52% 16%))`;
+  const kind = w.type === "MOVIE" ? "Film" : w.isAnime ? "Anime" : "Series";
+  const initials = w.title.split(/[\s:\-]+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join("");
+  const ph = `<div class="ph" style="background:${bg}"><span class="i" aria-hidden="true">${esc(initials)}</span><span class="k">${kind}${w.year ? " · " + w.year : ""}</span><span class="t">${esc(w.title)}</span></div>`;
+  const img = imgTag(Catalog.imgs(w.posterPath), "");
+  return `<div class="poster" ${extra}>${ph}${img}</div>`;
+}
+const kindLabel = (w) => (w.type === "MOVIE" ? "Movie" : w.isAnime ? "Anime" : "Series");
+const STATUS = { NOT_STARTED: "Not started", WATCHING: "Watching", COMPLETED: "Completed", ON_HOLD: "On hold", DROPPED: "Dropped" };
+const INTEREST = { UNCLASSIFIED: "Undecided", INTERESTED: "Interested", NOT_INTERESTED: "Not interested" };
+const emptyBlock = (title, text, btns = "") => `<div class="empty"><h3>${esc(title)}</h3><p>${esc(text)}</p>${btns ? `<div class="btns">${btns}</div>` : ""}</div>`;
+const progressBar = (f, label) => `<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(f * 100)}" aria-label="${esc(label)}"><span style="width:${(f * 100).toFixed(1)}%"></span></div>`;
+function topbar(title, actions = "") { return `<header class="topbar"><h1>${esc(title)}</h1>${actions}</header>`; }
+function banners() {
+  let h = "";
+  if (UI.loadNote) h += `<div class="banner warn" role="status">${esc(UI.loadNote)}</div>`;
+  if (UI.saveError) h += `<div class="banner warn" role="alert">${esc(UI.saveError)}</div>`;
+  return h ? `<div style="display:grid;gap:8px;margin-bottom:8px">${h}</div>` : "";
+}
+
+const TABS = [["home", "Home", I.home], ["discover", "Discover", I.search], ["library", "Library", I.library], ["calendar", "Calendar", I.calendar], ["profile", "Profile", I.profile]];
+function renderNav() {
+  const html = TABS.map(([id, label, icon]) => `<button class="tab" data-act="tab" data-id="${id}" ${UI.tab === id && !UI.detail ? 'aria-current="page"' : ""}>${icon}<span>${label}</span></button>`).join("");
+  document.getElementById("tabbar").innerHTML = html;
+  document.getElementById("side-tabs").innerHTML = html;
+  document.getElementById("side-foot").textContent = Persist.mode === "cloud" ? "Saved privately to your Claude account"
+    : Sync.active() ? (Sync.phase === "error" ? "Cloud sync problem · see Profile" : Sync.pending() ? `Syncing ${Sync.pending()} change${Sync.pending() > 1 ? "s" : ""}…` : "Backed up to the cloud")
+    : Persist.mode === "local" ? "Local only · saved in this browser" : Persist.mode === "memory" ? "Not saving: storage unavailable" : "";
+}
+
+// ---------- HOME ----------
+function viewHome() {
+  if (UI.loading) return topbar("Up next") + skeleton();
+  const lib = library();
+  const t = today(), incl = S.settings.includeSpecials;
+  if (!lib.length) {
+    return topbar("Up next") + banners() + emptyBlock("Your nest is empty",
+      "Add a movie, series or anime you're watching. Track episodes, keep a watchlist and see what airs next, all privately.",
+      `<button class="btn primary" data-act="tab" data-id="discover">Search titles</button><button class="btn" data-act="manual">Add one manually</button>`);
+  }
+  const series = lib.filter((x) => x.w.type === "SERIES" && followed(x) && x.st.status !== "COMPLETED");
+  const items = series.filter((x) => x.eps.length).map((x) => ({ x, n: upNextOf(x.eps, x.watched, t, incl), p: progressOf(x.eps, x.watched, t, incl) }));
+  const next = items.filter((i) => i.n.kind === "next").sort((a, b) => b.x.last - a.x.last);
+  const waiting = items.filter((i) => i.n.kind === "waiting" || i.n.kind === "undated");
+  const needs = series.filter((x) => !x.eps.length);
+  const soon = upcoming(lib, 7);
+  const wl = lib.filter((x) => x.st.watchlist && x.st.interest !== "NOT_INTERESTED" && !x.watched.size && !x.movies.length).sort((a, b) => (b.st.watchlistAt || 0) - (a.st.watchlistAt || 0));
+  const recent = Object.values(S.events).filter((e) => e.deletedAt == null && S.states[e.workId] && S.works[e.workId]).sort((a, b) => b.watchedAt - a.watchedAt).slice(0, 8);
+  const epsLeft = next.reduce((n, i) => n + i.p.missing, 0);
+
+  let h = topbar("Up next") + banners();
+  h += `<div class="hero-strip">
+    <div class="stat"><b class="num">${next.length}</b><span>shows ready</span></div>
+    <div class="stat"><b class="num">${epsLeft}</b><span>episodes to catch up</span></div>
+    <div class="stat"><b class="num">${soon.length}</b><span>airing this week</span></div></div>`;
+
+  h += `<section class="section"><div class="section-head"><h2>Continue watching</h2></div>`;
+  if (next.length) {
+    h += `<div class="next-grid">` + next.map(({ x, n, p }) => `
+      <article class="card next-card">
+        <button class="tile" data-act="open" data-id="${esc(x.w.id)}" aria-label="Open ${esc(x.w.title)}">${poster(x.w)}</button>
+        <div style="min-width:0;display:grid;gap:4px">
+          <button class="link-btn" style="padding:0;text-align:left;color:inherit" data-act="open" data-id="${esc(x.w.id)}"><span class="title">${esc(x.w.title)}</span></button>
+          <div class="ep">${esc(epCode(n.ep))}${n.ep.title ? ` · ${esc(n.ep.title)}` : ""}</div>
+          <div class="small muted">Aired ${esc(fmtDate(n.ep.airDate))}</div>
+          ${progressBar(p.fraction, `${p.watched} of ${p.total} aired episodes watched`)}
+          <div class="tiny muted num">${p.watched}/${p.total} aired · ${p.missing} left</div>
+        </div>
+        <button class="watch-btn" data-act="watch-next" data-id="${esc(x.w.id)}" data-ep="${esc(n.ep.id)}" aria-label="Mark ${esc(epCode(n.ep))} of ${esc(x.w.title)} watched">${I.check}</button>
+      </article>`).join("") + `</div>`;
+  } else {
+    h += `<div class="banner">${needs.length ? "Some shows have no episode list yet. Open one to add episodes." : "Nothing ready to watch. Shows you're watching appear here with their next aired episode."}</div>`;
+  }
+  h += `</section>`;
+
+  if (needs.length) h += section("Episodes not loaded", rows(needs.map((x) => [x, x.w.isManual ? "Manual title: add episodes on its page" : "Open the show to load its episodes"])));
+  if (soon.length) h += section("Coming up this week", rows(soon.map((u) => [u.x, `${relDay(u.date)} · ${u.e ? epCode(u.e) : "Release"}`])), `<button class="link-btn" data-act="tab" data-id="calendar">Calendar</button>`);
+  if (waiting.length) h += section("Caught up", rows(waiting.map(({ x, n }) => [x, n.kind === "waiting" ? `Next: ${epCode(n.ep)} on ${fmtDate(n.ep.airDate)}` : `Next: ${epCode(n.ep)}, date not announced`])));
+  if (wl.length) h += section("On your watchlist", `<div class="shelf">${wl.map((x) => tile(x.w)).join("")}</div>`);
+  if (recent.length) h += section("Recent activity", `<div class="row-list">${recent.map((e) => {
+    const w = S.works[e.workId], ep = e.episodeId ? (S.episodes[w.id] || []).find((x) => x.id === e.episodeId) : null;
+    return `<button class="row" data-act="open" data-id="${esc(w.id)}"><div style="width:48px">${poster(w)}</div><div><div class="t">${esc(w.title)}</div><div class="small muted">${ep ? esc(epCode(ep)) : e.isRewatch ? "Rewatched" : "Watched"} · ${esc(relDay(dayOfMillis(e.watchedAt)))}</div></div><span></span></button>`;
+  }).join("")}</div>`);
+  return h;
+}
+const section = (title, body, action = "") => `<section class="section"><div class="section-head"><h2>${esc(title)}</h2>${action}</div>${body}</section>`;
+const tile = (w) => `<button class="tile" data-act="open" data-id="${esc(w.id)}">${poster(w)}<span class="t">${esc(w.title)}</span></button>`;
+const rows = (list) => `<div class="row-list">${list.map(([x, sub]) => `<button class="row" data-act="open" data-id="${esc(x.w.id)}"><div style="width:48px">${poster(x.w)}</div><div style="min-width:0"><div class="t">${esc(x.w.title)}</div><div class="small muted">${esc(sub)}</div></div><span></span></button>`).join("")}</div>`;
+const skeleton = () => `<div style="display:grid;gap:14px;margin-top:8px" aria-label="Loading">${'<div class="skeleton" style="height:112px"></div>'.repeat(4)}</div>`;
+
+// ---------- DISCOVER ----------
+const LANGS = ["en", "hi", "ta", "te", "ml", "kn", "bn", "mr", "pa", "ja", "ko", "zh", "es", "fr", "de", "it", "pt", "tr", "ar", "th"];
+const COUNTRIES = ["IN", "US", "GB", "JP", "KR", "CN", "FR", "ES", "DE", "IT", "BR", "MX", "TR", "CA", "AU"];
+function viewDiscover() {
+  const d = UI.disc, st = Catalog.status();
+  let h = topbar("Discover");
+  h += `<div class="search"><span aria-hidden="true">${I.search}</span><label class="sr" for="disc-q">Search titles</label>
+    <input id="disc-q" class="input" type="search" placeholder="Movies, series, anime, in any language" value="${esc(d.q)}" data-input="disc-q" autocomplete="off"></div>`;
+  if (st !== "ready") {
+    h += `<div class="card panel" style="margin-top:18px">
+      <h3>${st === "sandbox" ? "Live search isn't available in this preview" : "Connect the TMDB catalog"}</h3>
+      <p class="muted" style="margin:0">${esc(Catalog.message(st))}</p>
+      <div class="wrap-chips">
+        <button class="btn primary" data-act="manual" data-title="${esc(d.q)}">${d.q ? `Add “${esc(d.q)}” manually` : "Add a title manually"}</button>
+        ${st === "nokey" ? `<button class="btn" data-act="tab" data-id="profile">Add API key</button>` : ""}
+      </div></div>`;
+    return h;
+  }
+  const active = [d.year, d.lang, d.country, d.genre].filter(Boolean).length;
+  h += `<div class="chips" style="margin-top:12px" role="group" aria-label="Type">
+    ${[["all", "All"], ["movie", "Movies"], ["tv", "Series"]].map(([v, l]) => `<button class="chip" data-act="disc-type" data-v="${v}" aria-pressed="${d.type === v}">${l}</button>`).join("")}
+    <button class="chip" data-act="disc-filters">${I.sliders.replace("<svg", '<svg width="18" height="18"')} Filters${active ? ` (${active})` : ""}</button>
+    ${active || d.q ? `<button class="chip" data-act="disc-clear">Clear all</button>` : ""}</div>`;
+  if (d.filteredLocally) h += `<p class="small muted" style="margin:4px 0">Language, country and genre narrow each page of search results, so some pages look short.</p>`;
+  if (d.loading && !d.items.length) return h + skeleton();
+  if (d.error && !d.items.length) return h + emptyBlock(d.error === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.error),
+    `<button class="btn primary" data-act="disc-retry">Try again</button><button class="btn" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
+  if (!d.items.length) return h + emptyBlock(d.q ? `No match for “${d.q}”` : "No titles for these filters",
+    "TMDB doesn't list everything. Try another spelling or the original title, or add it yourself.",
+    `<button class="btn primary" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
+  const inLib = new Set(Object.keys(S.states));
+  h += `${!d.q && !active ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">Trending this week</h2></div>` : ""}<div style="display:grid;gap:2px;margin-top:6px">`;
+  h += d.items.map((it) => `<div class="result">
+      <button class="tile" style="width:64px" data-act="disc-open" data-key="${esc(it.key)}" aria-label="Open ${esc(it.title)}">${poster({ id: it.key, title: it.title, type: it.type, year: it.year, posterPath: it.posterPath, isAnime: it.anime })}</button>
+      <button class="tile" style="gap:2px" data-act="disc-open" data-key="${esc(it.key)}">
+        <span class="t">${esc(it.title)}</span>
+        ${it.originalTitle ? `<span class="small muted">${esc(it.originalTitle)}</span>` : ""}
+        <span class="small muted">${esc([it.year, it.type === "MOVIE" ? "Movie" : "Series", langName(it.lang), it.countries[0] && countryName(it.countries[0])].filter(Boolean).join(" · "))}</span>
+        <span class="meta-line">${it.anime ? '<span class="pill">Anime?</span>' : ""}${inLib.has(it.key) ? '<span class="pill accent">In library</span>' : ""}</span>
+      </button>
+      ${d.opening === it.key ? '<span class="small muted">Opening…</span>' : inLib.has(it.key) ? "" : `<button class="icon-btn" data-act="disc-watchlist" data-key="${esc(it.key)}" aria-label="Add ${esc(it.title)} to watchlist">${I.bookmark}</button>`}
+    </div>`).join("");
+  h += `</div>`;
+  if (d.page < d.pages) h += `<div style="display:flex;justify-content:center;margin:16px 0"><button class="btn" data-act="disc-more" ${d.loading ? "disabled" : ""}>${d.loading ? "Loading…" : "Load more"}</button></div>`;
+  h += `<div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-act="manual" data-title="${esc(d.q)}">Can't find it? Add it manually</button>
+    <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
+  return h;
+}
+let discTimer = null, discSeq = 0;
+function discoverReload(debounce) {
+  clearTimeout(discTimer);
+  if (Catalog.status() !== "ready") { render(); return; }
+  discTimer = setTimeout(() => discoverFetch(1), debounce ? 380 : 0);
+}
+async function discoverFetch(page) {
+  const d = UI.disc, seq = ++discSeq;
+  d.loading = true; d.error = null; if (page === 1) { d.items = []; d.page = 0; } render();
+  const q = d.q.trim(), lang = S.settings.lang;
+  try {
+    let items = [], pages = 1, local = false;
+    if (q) {
+      const path = d.type === "movie" ? "search/movie" : d.type === "tv" ? "search/tv" : "search/multi";
+      const r = await Catalog.call(path, { query: q, page, language: lang, include_adult: "false",
+        primary_release_year: d.type === "movie" ? d.year : null, first_air_date_year: d.type === "tv" ? d.year : null });
+      const forced = d.type === "movie" ? "MOVIE" : d.type === "tv" ? "SERIES" : null;
+      items = r.results.map((x) => Catalog.item(x, forced)).filter(Boolean);
+      local = !!(d.lang || d.country || d.genre || (d.year && d.type === "all"));
+      items = items.filter((i) => (!d.lang || i.lang === d.lang) && (!d.country || i.countries.includes(d.country)) && (!d.genre || i.genreIds.includes(d.genre)) && (!d.year || d.type !== "all" || i.year === Number(d.year)));
+      pages = r.total_pages;
+    } else if (d.year || d.lang || d.country || d.genre) {
+      const params = { page, language: lang, with_genres: d.genre, with_original_language: d.lang, with_origin_country: d.country, sort_by: "popularity.desc", include_adult: "false" };
+      const [m, t] = await Promise.all([
+        d.type !== "tv" ? Catalog.call("discover/movie", { ...params, primary_release_year: d.year }) : null,
+        d.type !== "movie" ? Catalog.call("discover/tv", { ...params, first_air_date_year: d.year }) : null]);
+      items = [...(m?.results || []).map((x) => Catalog.item(x, "MOVIE")), ...(t?.results || []).map((x) => Catalog.item(x, "SERIES"))].filter(Boolean);
+      pages = Math.max(m?.total_pages || 1, t?.total_pages || 1);
+    } else {
+      const r = await Catalog.call("trending/all/week", { page, language: lang });
+      items = r.results.map((x) => Catalog.item(x)).filter(Boolean); pages = r.total_pages;
+    }
+    if (seq !== discSeq) return;
+    const seen = new Set(d.items.map((i) => i.key));
+    d.items = [...d.items, ...items.filter((i) => !seen.has(i.key) && seen.add(i.key))];
+    d.page = page; d.pages = pages; d.filteredLocally = local;
+  } catch (e) { if (seq === discSeq) d.error = e.code || "network"; }
+  if (seq === discSeq) { d.loading = false; render(); }
+}
+
+// ---------- LIBRARY ----------
+function viewLibrary() {
+  if (UI.loading) return topbar("Library") + skeleton();
+  const all = library(), f = UI.lib, grid = S.settings.grid;
+  const actions = `<button class="icon-btn" data-act="lib-grid" aria-label="${grid ? "Show as list" : "Show as poster grid"}">${grid ? I.list : I.grid}</button><button class="btn primary" data-act="manual">${I.plus}<span>Add</span></button>`;
+  let h = topbar("Library", actions) + banners();
+  if (!all.length) return h + emptyBlock("Nothing saved yet", "Titles you add, rate, put on your watchlist or start watching live here.",
+    `<button class="btn primary" data-act="tab" data-id="discover">Search titles</button><button class="btn" data-act="manual">Add one manually</button>`);
+  const q = f.q.trim().toLowerCase();
+  let items = all.filter((x) => (!q || x.w.title.toLowerCase().includes(q) || (x.w.originalTitle || "").toLowerCase().includes(q))
+    && (f.kind === "all" || (f.kind === "movie" && x.w.type === "MOVIE") || (f.kind === "series" && x.w.type === "SERIES" && !x.w.isAnime) || (f.kind === "anime" && x.w.isAnime))
+    && (!f.status || x.st.status === f.status) && (!f.interest || x.st.interest === f.interest) && (!f.watchlist || x.st.watchlist)
+    && (!f.year || x.w.year === f.year) && (!f.lang || x.w.originalLanguage === f.lang) && (!f.country || (x.w.countries || []).includes(f.country)) && (!f.genre || (x.w.genres || []).includes(f.genre)));
+  const sorters = {
+    updated: (a, b) => b.last - a.last,
+    title: (a, b) => a.w.title.localeCompare(b.w.title),
+    release: (a, b) => (b.w.releaseDate || "").localeCompare(a.w.releaseDate || "") || (a.w.releaseDate ? 0 : 1),
+    rating: (a, b) => (b.st.rating ?? -1) - (a.st.rating ?? -1) || a.w.title.localeCompare(b.w.title),
+  };
+  items.sort(sorters[f.sort]);
+  if (f.sort === "release") items = [...items.filter((x) => x.w.releaseDate), ...items.filter((x) => !x.w.releaseDate)];
+  const extra = [f.status, f.interest, f.year, f.lang, f.country, f.genre].filter(Boolean).length;
+  h += `<div class="search"><span aria-hidden="true">${I.search}</span><label class="sr" for="lib-q">Search your library</label>
+    <input id="lib-q" class="input" type="search" placeholder="Search your library" value="${esc(f.q)}" data-input="lib-q" autocomplete="off"></div>
+    <div class="chips" style="margin-top:12px">
+      ${[["all", "All"], ["movie", "Movies"], ["series", "Series"], ["anime", "Anime"]].map(([v, l]) => `<button class="chip" data-act="lib-kind" data-v="${v}" aria-pressed="${f.kind === v}">${l}</button>`).join("")}
+      <button class="chip" data-act="lib-wl" aria-pressed="${f.watchlist}">Watchlist</button>
+      <button class="chip" data-act="lib-filters">${I.sliders.replace("<svg", '<svg width="18" height="18"')} Filters${extra ? ` (${extra})` : ""}</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:2px 0 12px"><span class="small muted num" style="flex:1">${items.length} of ${all.length}</span>
+      <label class="small muted" for="lib-sort">Sort</label>
+      <select id="lib-sort" class="input" style="width:auto;min-height:40px;padding:6px 10px" data-input="lib-sort">
+        ${[["updated", "Last updated"], ["title", "Title"], ["release", "Release date"], ["rating", "My rating"]].map(([v, l]) => `<option value="${v}" ${f.sort === v ? "selected" : ""}>${l}</option>`).join("")}
+      </select></div>`;
+  if (!items.length) return h + emptyBlock("No titles match", "Try fewer filters.", `<button class="btn" data-act="lib-clear">Clear filters</button>`);
+  const sub = (x) => {
+    if (x.w.type === "SERIES" && x.eps.length) { const p = progressOf(x.eps, x.watched, today(), S.settings.includeSpecials); return `${p.watched}/${p.total} episodes`; }
+    if (x.w.type === "MOVIE" && x.movies.length) return `Watched ${x.movies.length}×`;
+    return STATUS[x.st.status];
+  };
+  if (grid) {
+    h += `<div class="grid">${items.map((x) => `<button class="tile" data-act="open" data-id="${esc(x.w.id)}">${poster(x.w)}
+      <span class="t">${esc(x.w.title)}</span><span class="tiny muted">${esc(sub(x))}${x.st.rating ? ` · ★ ${x.st.rating}` : ""}</span></button>`).join("")}</div>`;
+  } else {
+    h += `<div class="row-list">${items.map((x) => `<button class="row" style="grid-template-columns:56px 1fr auto" data-act="open" data-id="${esc(x.w.id)}">
+      <div style="width:56px">${poster(x.w)}</div>
+      <div style="min-width:0"><div class="t">${esc(x.w.title)}</div><div class="small muted">${esc([x.w.year, kindLabel(x.w), sub(x)].filter(Boolean).join(" · "))}</div>
+      <div class="meta-line"><span class="pill">${STATUS[x.st.status]}</span>${x.st.interest !== "UNCLASSIFIED" ? `<span class="pill">${INTEREST[x.st.interest]}</span>` : ""}${x.st.watchlist ? '<span class="pill accent">Watchlist</span>' : ""}${x.w.isManual ? `<span class="pill ${x.w.demo ? "demo" : ""}">${x.w.demo ? "Demo" : "Manual"}</span>` : ""}</div></div>
+      <span class="num" style="font-weight:700">${x.st.rating ? x.st.rating + "/10" : ""}</span></button>`).join("")}</div>`;
+  }
+  return h;
+}
+
+// ---------- CALENDAR ----------
+function viewCalendar() {
+  if (UI.loading) return topbar("Calendar") + skeleton();
+  const lib = library(), up = upcoming(lib), t = today();
+  const undated = lib.filter((x) => x.w.type === "SERIES" && followed(x)).map((x) => ({ x, n: upNextOf(x.eps, x.watched, t, S.settings.includeSpecials) })).filter((i) => i.n.kind === "undated");
+  let h = topbar("Calendar") + banners();
+  if (!up.length && !undated.length) return h + emptyBlock("No upcoming dates", "Known air and release dates for titles you're watching or have on your watchlist appear here. Dates are never guessed.");
+  const groups = {};
+  for (const u of up) (groups[u.date] ||= []).push(u);
+  h += `<div style="display:grid;gap:18px">`;
+  for (const [date, list] of Object.entries(groups)) {
+    h += `<div class="cal-day"><h3>${esc(relDay(date))}${relDay(date) !== fmtDate(date) ? ` · ${esc(fmtDate(date))}` : ""}</h3>${rows(list.map((u) => [u.x, u.e ? `${epCode(u.e)}${u.e.title ? " · " + u.e.title : ""}` : "Movie release"]))}</div>`;
+  }
+  if (undated.length) h += `<div class="cal-day"><h3>Next episode date not announced</h3>${rows(undated.map((i) => [i.x, epCode(i.n.ep)]))}</div>`;
+  h += `</div><p class="tiny muted" style="margin-top:20px">Air dates are listed as dates, in your device's calendar. ReelNest doesn't send reminders; check this calendar for known dates.</p>`;
+  return h;
+}
+
+// ---------- PROFILE ----------
+function viewProfile() {
+  const lib = library(), s = S.settings;
+  const movies = lib.filter((x) => x.w.type === "MOVIE"), series = lib.filter((x) => x.w.type === "SERIES");
+  let minutes = 0, counted = 0, missing = 0;
+  for (const x of lib) {
+    for (const e of x.movies) { if (x.w.runtimeMinutes) { minutes += x.w.runtimeMinutes; counted++; } else missing++; }
+    for (const id of x.watched) { const ep = x.eps.find((e) => e.id === id); const rt = ep?.runtimeMinutes || x.w.runtimeMinutes; if (rt) { minutes += rt; counted++; } else missing++; }
+  }
+  const epsWatched = series.reduce((n, x) => n + x.watched.size, 0);
+  const caught = series.filter((x) => x.eps.length && progressOf(x.eps, x.watched, today(), s.includeSpecials).caughtUp).length;
+  const storageLine = Persist.mode === "cloud" ? "Saved privately to your Claude account. It's yours only, and it syncs wherever you open this page."
+    : Persist.mode === "local" ? "Saved in this browser only. Clearing site data deletes it. Export a backup regularly."
+    : "This browser isn't letting the page save. Export before closing.";
+  let h = topbar("Profile") + banners();
+  h += `<section class="section" style="margin-top:4px"><div class="section-head"><h2>Your numbers</h2></div>
+    <div class="hero-strip" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div class="stat"><b class="num">${lib.length}</b><span>titles</span></div>
+      <div class="stat"><b class="num">${epsWatched}</b><span>episodes watched</span></div>
+      <div class="stat"><b class="num">${movies.filter((x) => x.movies.length).length}<small class="muted" style="font-size:16px"> / ${movies.length}</small></b><span>movies watched</span></div>
+      <div class="stat"><b class="num">${caught}<small class="muted" style="font-size:16px"> / ${series.length}</small></b><span>series caught up</span></div>
+      <div class="stat"><b class="num">${counted ? "≈ " + esc(mins(minutes)) : "—"}</b><span>estimated watch time</span></div>
+    </div>
+    <p class="tiny muted" style="margin:0">Watch time is an estimate from runtimes.${missing ? ` ${missing} watches have no runtime and aren't counted (not treated as zero).` : ""} Everything here is private.</p></section>`;
+
+  h += `<section class="section"><div class="section-head"><h2>Backup &amp; sync</h2></div>${syncCard(storageLine)}</section>`;
+  h += `<section class="section"><div class="section-head"><h2>Backup file</h2></div><div class="card panel">
+    <p class="small muted" style="margin:0">A backup file works with or without an account. Keep a copy somewhere other than this device.</p>
+    <div class="wrap-chips"><button class="btn primary" data-act="export">Export backup</button><button class="btn" data-act="import">Import backup</button></div>
+    ${Object.values(S.works).some((w) => w.demo) ? `<div class="banner"><div style="display:grid;gap:8px"><span>Your library still has demo titles from an earlier version.</span><div><button class="btn" data-act="remove-demo">Remove demo titles</button></div></div></div>` : ""}
+  </div></section>`;
+
+  if (S.conflicts.length) {
+    h += section(`Needs review (${S.conflicts.length})`, `<div class="card panel">${S.conflicts.map((c, i) => `<div style="display:grid;gap:4px">
+      <div>${c.kind === "notes" ? `Two versions of your notes for <b>${esc(S.works[c.workId]?.title || "a title")}</b>. The newer one was kept; the other text:` : esc(c.detail)}</div>
+      ${c.kind === "notes" ? `<blockquote class="small" style="margin:0;padding-left:10px;border-left:3px solid var(--line)">${esc(c.detail)}</blockquote>` : ""}
+      <div><button class="link-btn" data-act="conflict-dismiss" data-i="${i}">Dismiss</button></div></div>`).join("")}</div>`);
+  }
+
+  h += `<section class="section"><div class="section-head"><h2>Preferences</h2></div><div class="card panel">
+    <div class="field"><span style="font-weight:600">Theme</span><div class="seg" role="group" aria-label="Theme">
+      ${[["system", "Automatic"], ["dark", "Dark"], ["light", "Light"]].map(([v, l]) => `<button data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join("")}</div></div>
+    <div class="field"><label for="region">Viewing country</label>
+      <select id="region" class="input" data-act-change="set-region">${[...new Set([region(), ...REGIONS])].map((c) => `<option value="${c}" ${c === region() ? "selected" : ""}>${esc(countryName(c))}</option>`).join("")}</select>
+      <span class="tiny muted">Used for “Where to watch” and age certifications. It's where you watch, not where a title was made.</span></div>
+    ${toggleRow("includeSpecials", "Count specials toward “caught up”", "Specials are always listed; this decides whether they count.")}
+    ${toggleRow("hideSpoilers", "Hide synopses of unwatched episodes", "Tap to reveal one when you want it.")}
+  </div></section>`;
+
+  if (!IN_SANDBOX) {
+    h += `<section class="section"><div class="section-head"><h2>Catalog</h2></div><div class="card panel">
+      <p class="small" style="margin:0">Search and episode lists come from TMDB. Get a free API key at themoviedb.org › Settings › API (a VPN may be needed just to sign up from India). It's stored only in this browser and never exported.</p>
+      <div class="field"><label for="tmdb-key">TMDB API key or read access token</label><input id="tmdb-key" class="input" type="password" autocomplete="off" value="${esc(Catalog.key())}"></div>
+      <div class="field"><label for="tmdb-relay">Catalog relay address (for networks that block TMDB)</label><input id="tmdb-relay" class="input" inputmode="url" autocomplete="off" placeholder="https://reelnest-tmdb.yourname.workers.dev" value="${esc(Catalog.relay())}">
+        <span class="tiny muted">Leave empty to connect directly. If Jio or your ISP blocks TMDB, deploy the free relay from the README and paste its address here. A relay that holds your key lets you leave the key field empty.</span></div>
+      <div class="field"><label for="tmdb-lang">Title language</label><input id="tmdb-lang" class="input" value="${esc(s.lang)}" placeholder="en-US, hi-IN, ja-JP"><span class="tiny muted">Only picks which translation of titles to show. Search still covers every country and language.</span></div>
+      <div><button class="btn primary" data-act="save-catalog">Save</button></div>
+      <p class="tiny muted" style="margin:0">This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div></section>`;
+  }
+
+  h += `<section class="section"><div class="section-head"><h2>Privacy</h2></div><div class="card panel small" style="gap:10px">
+    <p style="margin:0">No followers, feeds, comments or public profiles. Ratings and notes stay private.</p>
+    <div><b>On this device</b><br><span class="muted">Your library, watch history, ratings, notes, manual titles and preferences${IN_SANDBOX ? "" : ", plus your TMDB key and relay address (these never leave this browser except to TMDB or your relay)"}.</span></div>
+    ${IN_SANDBOX ? `<div><b>Inside Claude</b><br><span class="muted">Your library is saved to your Claude account, private to you. This page contacts no other service.</span></div>` : `
+    <div><b>In the cloud, only if you sign in</b><br><span class="muted">Your email address and a copy of your library, history, ratings, notes, manual titles and preferences, stored in the Supabase project configured for this site. Not your TMDB key.</span></div>
+    <div><b>Other services this app contacts</b><br><span class="muted">TMDB (your searches, the titles you open, your API key) or your relay instead; poster images from TMDB's image servers, falling back to the public image proxy wsrv.nl when those are blocked (it sees which poster is requested); Google Fonts for the typeface. YouTube, IMDb and TMDB pages open only when you tap their links.</span></div>`}
+  </div></section>
+    <section class="section"><div class="section-head"><h2>Delete data</h2></div><div>
+    <p class="small muted" style="margin:0 0 10px;max-width:65ch">Removes your whole library ${Persist.mode === "cloud" ? "from your Claude account for this page" : "from this browser"}. ${Sync.active() ? "Your cloud copy is separate: delete it from Backup &amp; sync if you want it gone too. " : ""}Export first if you want to keep anything.</p>
+    <button class="btn danger" data-act="wipe">Delete all my data…</button></div></section>
+    <p class="tiny muted" style="margin:28px 0 0">ReelNest · an independent personal tracker, not affiliated with any streaming service.</p>`;
+  return h;
+}
+// ---------- Link a manual title to its catalog entry (preview first; progress is never dropped) ----------
+function linkSheet(m) {
+  const w = S.works[m.id];
+  if (m.preview) {
+    const p = m.preview, t = p.target;
+    return `<h2 id="m-title">Link to “${esc(t.title)}”${t.year ? ` (${t.year})` : ""}?</h2>
+      <div class="kv"><span>Title</span><b>${esc(w.title)} → ${esc(t.title)}</b>
+        ${w.type === "SERIES" ? `<span>Episodes matched by season and number</span><b class="num">${p.matched}</b>
+        <span>Watch records moved onto catalog episodes</span><b class="num">${p.moved}</b>
+        <span>Your episodes with no catalog match (kept)</span><b class="num">${p.kept.length}</b>` : `<span>Watch records kept</span><b class="num">${p.moved}</b>`}</div>
+      ${p.kept.length ? `<p class="small muted" style="margin:0">Kept as manual: ${esc(p.kept.map(epCode).join(", "))}</p>` : ""}
+      ${p.existing ? `<div class="banner">This catalog title is already in your library. Both will be combined: watch history merged, the newest status, rating and watchlist kept, and both sets of notes kept.</div>` : ""}
+      <p class="small muted" style="margin:0">Your status, rating, notes and watch history are kept. Details and artwork will come from TMDB from now on.</p>
+      <div class="actions"><button class="btn ghost" data-act="link-back">Back</button><button class="btn primary" data-act="link-apply">Link</button></div>`;
+  }
+  return `<h2 id="m-title">Link “${esc(w.title)}” to the catalog</h2>
+    <div class="field"><label for="link-q">Search TMDB</label><input id="link-q" class="input" value="${esc(m.q)}" data-input="link-q" autocomplete="off"></div>
+    ${m.busy ? `<p class="small muted" style="margin:0">${m.busy}</p>` : ""}${m.error ? `<div class="banner warn">${esc(m.error)}</div>` : ""}
+    <div style="display:grid;gap:2px;max-height:46vh;overflow:auto">${(m.items || []).map((it) => `<button class="row" style="grid-template-columns:44px 1fr" data-act="link-pick" data-key="${esc(it.key)}">
+      <div style="width:44px">${poster({ id: it.key, title: it.title, type: it.type, year: it.year, posterPath: it.posterPath, isAnime: it.anime })}</div>
+      <div><div class="t">${esc(it.title)}</div><div class="small muted">${esc([it.year, it.originalTitle, langName(it.lang)].filter(Boolean).join(" · "))}</div></div></button>`).join("")}
+      ${m.items && !m.items.length && !m.busy ? `<p class="small muted">No matches. Try the original title or another spelling. Keeping it manual works just as well.</p>` : ""}</div>
+    <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button></div>`;
+}
+let linkTimer = null;
+async function linkSearch() {
+  const m = UI.modal; if (!m || m.type !== "link") return;
+  const w = S.works[m.id];
+  m.busy = "Searching…"; m.error = null; render();
+  try {
+    const r = await Catalog.call(w.type === "MOVIE" ? "search/movie" : "search/tv", { query: m.q.trim(), page: 1, language: S.settings.lang, include_adult: "false" });
+    if (UI.modal !== m) return;
+    m.items = r.results.map((x) => Catalog.item(x, w.type)).filter(Boolean).slice(0, 12);
+  } catch (e) { m.error = Catalog.message(e.code); m.items = []; }
+  m.busy = null; render();
+}
+async function linkPreview(key) {
+  const m = UI.modal, w = S.works[m.id], it = m.items.find((i) => i.key === key);
+  m.busy = "Loading the catalog entry and its episodes…"; render();
+  try {
+    const d = await Catalog.details(it);
+    let eps = [];
+    for (const s of d.seasons) eps = eps.concat(await Catalog.season(d.work, s.number));
+    const manualEps = (S.episodes[m.id] || []).filter((e) => e.isManual);
+    const bySlot = new Map(eps.map((e) => [e.season + ":" + e.number, e]));
+    const map = {}, kept = [];
+    for (const e of manualEps) { const c = bySlot.get(e.season + ":" + e.number); if (c) map[e.id] = c.id; else kept.push(e); }
+    const evs = activeEvents(m.id);
+    m.preview = { target: d.work, seasons: d.seasons, eps, map, kept, matched: Object.keys(map).length,
+      moved: w.type === "SERIES" ? evs.filter((e) => e.episodeId && map[e.episodeId]).length : evs.length, existing: !!S.states[d.work.id] };
+  } catch (e) { m.error = Catalog.message(e.code); }
+  m.busy = null; render();
+}
+function applyLink() {
+  const m = UI.modal, p = m.preview, oldId = m.id, t = p.target, newId = t.id, w = S.works[oldId], tm = now();
+  const existing = S.works[newId];
+  S.works[newId] = { ...t, createdAt: Math.min(w.createdAt || tm, existing?.createdAt || tm), isAnime: w.isAnime, updatedAt: tm };
+  S.seasons[newId] = p.seasons.map((s) => ({ ...s, fetchedAt: tm }));
+  const keptMoved = p.kept.map((e) => ({ ...e, workId: newId, updatedAt: tm }));
+  const keepIds = new Set(keptMoved.map((e) => e.id));
+  S.episodes[newId] = [...(S.episodes[newId] || []).filter((e) => !keepIds.has(e.id) && !p.eps.some((n) => n.id === e.id)), ...p.eps, ...keptMoved];
+  // Watch records: recreated on the catalog title (never lost), old ones closed.
+  const already = new Set(activeEvents(newId).map((e) => e.episodeId).filter(Boolean));
+  for (const e of activeEvents(oldId)) {
+    S.events[e.id] = { ...e, deletedAt: tm };
+    const ep = e.episodeId ? (p.map[e.episodeId] || e.episodeId) : null;
+    if (ep && already.has(ep)) continue;
+    const c = { ...e, id: uuid(), workId: newId, episodeId: ep, createdAt: tm, deletedAt: null, deviceId: DEVICE };
+    S.events[c.id] = c;
+  }
+  // State: copied with fresh timestamps, or combined with the existing catalog entry (both notes kept).
+  const mine = S.states[oldId];
+  if (mine) {
+    const bumped = { ...mine, workId: newId, interestAt: tm, statusAt: tm, watchlistAt: tm, ratingAt: tm, notesAt: tm, deviceId: DEVICE };
+    const theirs = S.states[newId];
+    let merged = theirs ? mergeState(theirs, bumped).state : bumped;
+    if (theirs && theirs.notes && mine.notes && theirs.notes !== mine.notes) merged = { ...merged, notes: theirs.notes + "\n\n" + mine.notes };
+    S.states[newId] = { ...merged, addedAt: Math.min(mine.addedAt || tm, theirs?.addedAt || tm) };
+    delete S.tombs[newId];
+  }
+  delete S.states[oldId];
+  S.tombs[oldId] = { entityType: "work", entityId: oldId, deletedAt: tm, deviceId: DEVICE };
+  Persist.touch(newId); Persist.touch(oldId); Persist.touchMeta();
+  delete S.works[oldId]; delete S.episodes[oldId]; delete S.seasons[oldId];
+  UI.modal = null; toast(`Linked to “${t.title}”. Your progress was kept.`);
+  openDetail(newId);
+}
+
+function syncCard(storageLine) {
+  if (IN_SANDBOX) return `<div class="card panel"><b>Saved to your Claude account</b><p class="small muted" style="margin:0">${esc(storageLine)}</p></div>`;
+  const localWarn = `<p class="small" style="margin:0">Right now your library lives only in this browser. Clearing browser data, using private mode, or switching browsers or devices loses it, unless you've exported a backup or turned on cloud backup.</p>`;
+  if (!CloudCfg.configured()) {
+    return `<div class="card panel"><div><b>Local only</b></div>${localWarn}
+      <details><summary>Set up cloud backup (one-time, for the site owner)</summary>
+        <div style="display:grid;gap:10px;margin-top:10px"><p class="small muted" style="margin:0">Create a free Supabase project, run <code>supabase/schema.sql</code>, then paste the project URL and its public anon key. The steps are in the README.</p>
+        <div class="field"><label for="sb-url">Supabase project URL</label><input id="sb-url" class="input" inputmode="url" placeholder="https://xxxx.supabase.co" autocomplete="off"></div>
+        <div class="field"><label for="sb-key">Public anon key</label><input id="sb-key" class="input" autocomplete="off"><span class="tiny muted">This key is meant to be public. Your data is protected by the server's per-account rules, not by hiding this key.</span></div>
+        <div><button class="btn" data-act="sb-save">Save</button></div></div></details></div>`;
+  }
+  if (!Sync.signedIn() || !Sync.active()) {
+    const a = Sync.auth;
+    const form = a.step === "code"
+      ? `<div class="field"><label for="sb-code">Code from the email sent to ${esc(a.email)}</label><input id="sb-code" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></div>
+         <div class="wrap-chips"><button class="btn primary" data-act="sb-verify" ${a.busy ? "disabled" : ""}>${a.busy ? "Checking…" : "Sign in"}</button><button class="btn ghost" data-act="sb-restart">Use another email</button></div>
+         <p class="tiny muted" style="margin:0">You can also tap the link in the email on this device.</p>`
+      : `<div class="field"><label for="sb-email">Email</label><input id="sb-email" class="input" type="email" autocomplete="email" value="${esc(a.email)}"></div>
+         <div class="wrap-chips"><button class="btn primary" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in code"}</button>
+         ${CloudCfg.google() ? `<a class="btn" href="${esc(Sync.googleUrl())}">Continue with Google</a>` : ""}</div>`;
+    return `<div class="card panel"><div><b>Local only</b> <span class="pill">Cloud backup off</span></div>${localWarn}
+      <p class="small muted" style="margin:0">Sign in to back up and sync. An account is optional; everything works without one. If this device already has titles, you'll be asked how to merge them. Nothing is replaced.</p>
+      ${form}${a.msg ? `<p class="small" role="status" style="margin:0;color:${a.msgErr ? "var(--warn)" : "var(--ink-muted)"}">${esc(a.msg)}</p>` : ""}
+      ${Sync.error ? `<div class="banner warn">${esc(Sync.error)}</div>` : ""}</div>`;
+  }
+  const pend = Sync.pending();
+  const status = Sync.phase === "syncing" ? `<span class="pill">Syncing…</span>`
+    : Sync.phase === "error" ? `<span class="pill" style="color:var(--warn)">Sync problem</span>`
+    : pend ? `<span class="pill">${pend} change${pend > 1 ? "s" : ""} waiting</span>` : Sync.lastOk ? `<span class="pill accent">Backed up</span>` : `<span class="pill">Not backed up yet</span>`;
+  return `<div class="card panel"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>Cloud backup on</b>${status}</div>
+    <div class="kv small"><span class="muted">Account</span><span>${esc(Sync.session.user.email || "signed in")}</span>
+      <span class="muted">Last confirmed backup</span><span class="num">${Sync.lastOk ? esc(relTime(Sync.lastOk)) : "never"}</span>
+      <span class="muted">Changes waiting to upload</span><span class="num">${pend}</span></div>
+    ${Sync.error ? `<div class="banner warn" role="alert"><div style="display:grid;gap:8px"><span>${esc(Sync.error)}</span><div><button class="btn" data-act="sb-sync">Retry now</button></div></div></div>` : ""}
+    <p class="tiny muted" style="margin:0">“Backed up” is shown only after the server confirms it. Changes made offline wait here and upload automatically.</p>
+    <div class="wrap-chips"><button class="btn primary" data-act="sb-sync" ${Sync.phase === "syncing" ? "disabled" : ""}>Sync now</button><button class="btn" data-act="sb-signout">Sign out</button><button class="btn danger" data-act="sb-delete">Delete cloud copy…</button></div></div>`;
+}
+function relTime(ms) {
+  const d = (now() - ms) / 1000;
+  if (d < 45) return "just now";
+  if (d < 3600) return `${Math.round(d / 60)} min ago`;
+  if (d < 86400) return `${Math.round(d / 3600)} h ago`;
+  return fmtDate(dayOfMillis(ms));
+}
+const toggleRow = (k, title, sub) => `<div class="toggle-row"><div style="flex:1"><div style="font-weight:600">${esc(title)}</div><div class="small muted">${esc(sub)}</div></div>
+  <button class="switch" role="switch" aria-checked="${!!S.settings[k]}" aria-label="${esc(title)}" data-act="set-toggle" data-k="${k}"></button></div>`;
+
+// ---------- DETAIL ----------
+function viewDetail(id) {
+  const w = S.works[id];
+  if (!w) return `${backBar()}${emptyBlock("This title isn't here anymore", "It may have been removed on another device.", `<button class="btn" data-act="back">Back</button>`)}`;
+  const st = S.states[id], t = today(), incl = S.settings.includeSpecials;
+  const watched = watchedSet(id), eps = (S.episodes[id] || []).slice().sort(epOrder);
+  const hue = hashHue(w.title + w.id);
+  const backdrop = imgTag(Catalog.imgs(w.backdropPath, "w1280"), "backdrop");
+  const x = w.extra || {};
+  let h = `<div class="detail-hero ${backdrop ? "has-bd" : ""}" style="--hero:linear-gradient(180deg, hsl(${hue} 40% 30% / .55), transparent)">${backdrop}${backBar(w)}
+    <div class="detail-head">${poster(w)}<div style="display:grid;gap:10px;min-width:0">
+      <h1>${esc(w.title)}</h1>
+      ${w.originalTitle && w.originalTitle !== w.title ? `<div class="muted" style="font-weight:600">${esc(w.originalTitle)}</div>` : ""}
+      ${x.tagline ? `<div class="tagline">“${esc(x.tagline)}”</div>` : ""}
+      ${x.score ? `<div class="score" aria-label="TMDB user score ${x.score} out of 10 from ${x.votes} votes"><b class="num">★ ${x.score.toFixed(1)}</b><span class="muted small num">TMDB · ${x.votes.toLocaleString()} votes</span></div>` : ""}
+      <div class="meta-line">
+        <span class="pill accent">${kindLabel(w)}</span>
+        ${w.isManual ? `<span class="pill ${w.demo ? "demo" : ""}">${w.demo ? "Demo title" : "Manual entry"}</span>` : ""}
+        ${w.year ? `<span class="pill num">${w.year}</span>` : ""}
+        ${certFor(x) ? `<span class="pill" title="Certification in ${esc(countryName(region()))}">${esc(certFor(x))}</span>` : ""}
+        ${w.originalLanguage ? `<span class="pill">${esc(langName(w.originalLanguage))}</span>` : ""}
+        ${(w.countries || []).slice(0, 2).map((c) => `<span class="pill">${esc(countryName(c))}</span>`).join("")}
+        ${w.runtimeMinutes ? `<span class="pill">${w.type === "SERIES" ? "~" + w.runtimeMinutes + " min/ep" : mins(w.runtimeMinutes)}</span>` : ""}
+      </div>
+      ${(w.genres || []).length ? `<div class="small muted">${esc(w.genres.join(" · "))}</div>` : ""}
+      ${w.releaseDate && w.releaseDate > t ? `<div class="small" style="color:var(--accent);font-weight:700">${w.type === "MOVIE" ? "Releases" : "Premieres"} ${esc(fmtDate(w.releaseDate))}</div>` : ""}
+    </div></div></div>`;
+
+  h += `<div class="detail-cols" style="margin-top:8px"><div style="display:grid;gap:20px;min-width:0">`;
+  if (w.type === "SERIES") {
+    const p = progressOf(eps, watched, t, incl);
+    const missingAired = eps.filter((e) => !watched.has(e.id) && airState(e.airDate, t) === "aired" && (!isSpecial(e) || incl));
+    h += `<div class="card panel"><div class="section-head"><h3 style="flex:1">Progress</h3><button class="link-btn" data-act="rules">How it's counted</button></div>
+      ${progressBar(p.fraction, `${p.watched} of ${p.total} aired episodes watched`)}
+      <div style="display:flex;flex-wrap:wrap;gap:8px 18px" class="small"><span class="num"><b>${p.watched}</b> of <b>${p.total}</b> aired watched</span>
+        ${p.upcoming ? `<span class="muted num">${p.upcoming} upcoming</span>` : ""}${p.unknown ? `<span class="muted num">${p.unknown} undated</span>` : ""}
+        ${p.specialsTotal ? `<span class="muted num">specials ${p.specialsWatched}/${p.specialsTotal}</span>` : ""}</div>
+      ${st && st.status === "COMPLETED" && missingAired.length ? `<div class="banner"><div style="display:grid;gap:8px"><b>Marked completed, with ${missingAired.length} aired episodes not marked watched.</b>
+        <span>Setting a status never adds episode watches by itself.</span><div><button class="btn" data-act="complete-aired" data-id="${esc(id)}">Mark ${missingAired.length} aired episodes watched…</button></div></div></div>` : ""}
+    </div>`;
+    const seasonNums = [...new Set([...(S.seasons[id] || []).map((s) => s.number), ...eps.map((e) => e.season)])].sort((a, b) => (a === 0) - (b === 0) || a - b);
+    h += `<div style="display:grid;gap:10px"><div class="section-head"><h2 style="flex:1;font-size:21px">Seasons</h2>${w.isManual ? `<button class="btn" data-act="add-eps" data-id="${esc(id)}">${I.plus} Add episodes</button>` : ""}</div>`;
+    if (!seasonNums.length) h += `<div class="banner">${w.isManual ? "No episodes yet. Add seasons and episodes to track them." : "No season information from the catalog yet."}</div>`;
+    // Open the first season with an aired unwatched episode; otherwise the first with anything unwatched; otherwise the first.
+    const firstOpen = seasonNums.find((n) => eps.some((e) => e.season === n && !watched.has(e.id) && airState(e.airDate, t) === "aired" && !isSpecial(e)))
+      ?? seasonNums.find((n) => n !== 0 && eps.some((e) => e.season === n && !watched.has(e.id))) ?? seasonNums[0];
+    for (const n of seasonNums) {
+      const se = eps.filter((e) => e.season === n);
+      const meta = (S.seasons[id] || []).find((s) => s.number === n);
+      const key = id + "|" + n;
+      const open = UI.openSeasons[key] ?? (n === firstOpen);
+      const done = se.filter((e) => watched.has(e.id)).length;
+      h += `<div class="season"><div class="season-head" style="cursor:pointer" data-act="season-toggle" data-key="${esc(key)}" role="button" tabindex="0" aria-expanded="${open}">
+          <div><div class="t">${esc(meta?.name || (n === 0 ? "Specials" : `Season ${n}`))}</div><div class="small muted num">${se.length ? `${done}/${se.length} watched` : `${meta?.episodeCount ?? 0} episodes`}</div></div>
+          <div style="width:90px">${progressBar(se.length ? done / se.length : 0, `${done} of ${se.length} watched`)}</div>
+          <span style="display:inline-flex;transform:rotate(${open ? 180 : 0}deg)" aria-hidden="true">${I.chev.replace("<svg", '<svg width="22" height="22"')}</span></div>`;
+      if (open) {
+        h += `<div class="season-body"><div style="display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap">
+          <button class="chip" data-act="season-mark" data-id="${esc(id)}" data-n="${n}">Mark season watched…</button>
+          ${done ? `<button class="chip" data-act="season-unmark" data-id="${esc(id)}" data-n="${n}">Mark season unwatched…</button>` : ""}</div>`;
+        if (!se.length) h += `<div class="small muted" style="padding:0 16px 14px">${w.isManual ? "No episodes in this season yet." : Catalog.status() === "ready" ? "Loading episodes…" : "Episode list unavailable here."}</div>`;
+        h += se.map((e) => epRow(w, e, watched.has(e.id), t)).join("");
+        h += `</div>`;
+      }
+      h += `</div>`;
+    }
+    h += `</div>`;
+  } else {
+    const mw = movieWatches(id);
+    h += `<div class="card panel"><div class="section-head"><h3 style="flex:1">Watch history</h3><button class="btn primary" data-act="movie-watch" data-id="${esc(id)}">${I.check.replace("<svg", '<svg width="18" height="18"')} Mark watched</button></div>
+      ${mw.length ? mw.map((e) => `<div class="toggle-row"><div style="flex:1"><b>${esc(fmtDate(dayOfMillis(e.watchedAt)))}</b>${e.isRewatch ? ' <span class="pill">Rewatch</span>' : ""}</div>
+        <button class="icon-btn" data-act="event-del" data-ev="${esc(e.id)}" aria-label="Remove the watch on ${esc(fmtDate(dayOfMillis(e.watchedAt)))}">${I.x}</button></div>`).join("") : `<p class="muted" style="margin:0">Not watched yet.</p>`}
+    </div>`;
+  }
+  if (w.overview) h += `<div class="card panel"><h3>Overview</h3><p style="margin:0;max-width:65ch">${esc(w.overview)}</p></div>`;
+  h += watchSection(w);
+  h += detailsCard(w);
+  if ((w.cast || []).length) h += `<div class="card panel"><h3>Cast</h3><p style="margin:0" class="small">${esc(w.cast.join(", "))}</p></div>`;
+  if ((w.altTitles || []).length) h += `<details class="card panel"><summary>Also known as</summary><p class="small" style="margin:0">${esc(w.altTitles.join(" · "))}</p></details>`;
+  h += `<p class="tiny muted" style="margin:0">${w.isManual ? (w.demo ? "Demo title with made-up details, for trying the app. Delete it any time." : "Manual entry: details added by you, not from a catalog.") : `Data from TMDB${w.fetchedAt ? ", updated " + esc(fmtDate(dayOfMillis(w.fetchedAt))) : ""}. This product uses the TMDB API but is not endorsed or certified by TMDB.`}</p>`;
+  h += `</div><div style="display:grid;gap:20px">${libraryPanel(w, st)}</div></div>`;
+  return h;
+}
+const certFor = (x) => (x && x.certs ? x.certs[region()] || null : x && x.certification && x.certification.region === region() ? x.certification.value : null);
+
+// ---------- Where to watch (JustWatch data via TMDB; title-level; viewing region) ----------
+const WATCH_TTL = 24 * 3600e3;
+async function loadWatch(id, force) {
+  const w = S.works[id];
+  if (!w || w.isManual || !w.providerId || Catalog.status() !== "ready") return;
+  const cur = w.watch;
+  if (!force && cur && cur.region === region() && cur.fetchedAt > now() - WATCH_TTL) return;
+  UI.watch[id] = { loading: true };
+  if (UI.detail === id) render();
+  try {
+    const r = await Catalog.call(`${w.type === "MOVIE" ? "movie" : "tv"}/${w.providerId}/watch/providers`);
+    const reg = region(), d = (r.results || {})[reg] || null;
+    const trim = (arr) => (arr || []).slice().sort((a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99))
+      .map((p) => ({ id: p.provider_id, name: p.provider_name, logo: p.logo_path || null }));
+    w.watch = { region: reg, fetchedAt: now(), countries: Object.keys(r.results || {}).length,
+      data: d ? { link: d.link || null, stream: trim(d.flatrate), free: trim([...(d.free || []), ...(d.ads || [])]), rent: trim(d.rent), buy: trim(d.buy) } : null };
+    UI.watch[id] = null;
+    Persist.touch(id);
+  } catch (e) {
+    UI.watch[id] = { error: e.code || "network" };
+  }
+  if (UI.detail === id) render();
+}
+function watchSection(w) {
+  const reg = region(), regName = countryName(reg);
+  const head = `<div class="section-head"><h3 style="flex:1">Where to watch in ${esc(regName)}</h3>${!w.isManual && Catalog.status() === "ready" ? `<button class="link-btn" data-act="watch-refresh" data-id="${esc(w.id)}">Refresh</button>` : ""}</div>`;
+  const foot = (txt) => `<p class="tiny muted" style="margin:0">${txt} ReelNest doesn't stream or sell anything; it only shows where a title is offered.</p>`;
+  if (w.isManual) return `<div class="card panel">${head}<p class="small muted" style="margin:0">Availability information is unavailable for titles you added manually. Link it to a catalog entry to see providers.</p></div>`;
+  if (IN_SANDBOX) return `<div class="card panel">${head}<p class="small muted" style="margin:0">Availability information is unavailable in this preview, because pages inside Claude can't contact TMDB.</p></div>`;
+  if (Catalog.status() !== "ready") return `<div class="card panel">${head}<p class="small muted" style="margin:0">Availability information is unavailable until the catalog is connected in Profile.</p></div>`;
+  const st = UI.watch[w.id] || {}, cur = w.watch && w.watch.region === reg ? w.watch : null;
+  let body = "";
+  if (cur && cur.data) {
+    const group = (label, list) => list.length ? `<div class="prov-group"><span class="prov-label">${label}</span><div class="prov-list">${list.map((p) =>
+      `<span class="prov" title="${esc(p.name)}">${p.logo ? `<span class="prov-logo">${imgTag(Catalog.imgs(p.logo, "w92"), "")}</span>` : ""}<span>${esc(p.name)}</span></span>`).join("")}</div></div>` : "";
+    const d = cur.data;
+    const groups = group("Subscription", d.stream) + group("Free", d.free) + group("Rent", d.rent) + group("Buy", d.buy);
+    body = groups || `<p class="small" style="margin:0">No providers found for ${esc(regName)} in JustWatch's data. That doesn't mean it can't be watched there.</p>`;
+    if (d.link) body += `<div><a class="btn" href="${esc(d.link)}" target="_blank" rel="noopener">See offers and links on TMDB</a></div>`;
+  } else if (cur && !cur.data) {
+    body = `<p class="small" style="margin:0">No providers found for ${esc(regName)} in JustWatch's data. That doesn't mean it can't be watched there.</p>`;
+  } else if (st.loading || !st.error) {
+    body = `<p class="small muted" style="margin:0">Checking availability…</p>`;
+  }
+  if (st.error) {
+    body += `<div class="banner warn" role="status"><div style="display:grid;gap:6px"><span>${cur ? "Couldn't refresh availability, so this may be out of date." : "Availability information is unavailable right now."} ${esc(Catalog.message(st.error))}</span>
+      <div><button class="btn" data-act="watch-refresh" data-id="${esc(w.id)}">Try again</button></div></div></div>`;
+  }
+  const stale = cur && cur.fetchedAt < now() - 7 * 864e5;
+  const meta = cur ? `Data from JustWatch, via TMDB. Last refreshed ${esc(fmtDate(dayOfMillis(cur.fetchedAt)))}${stale ? " (more than a week ago)" : ""}. Covers the whole ${w.type === "MOVIE" ? "film" : "series"}, not individual seasons or episodes.`
+    : "Data from JustWatch, via TMDB. Covers the whole title, not individual seasons or episodes.";
+  return `<div class="card panel" aria-live="polite">${head}${body}${foot(meta)}</div>`;
+}
+
+function detailsCard(w) {
+  const x = w.extra || {};
+  const rows = [];
+  const add = (k, v) => { if (v && (!Array.isArray(v) || v.length)) rows.push([k, Array.isArray(v) ? v.join(", ") : v]); };
+  add(w.type === "MOVIE" ? "Release date" : "First aired", w.releaseDate ? fmtDate(w.releaseDate) : null);
+  if (w.type === "SERIES") {
+    add("Last aired", x.lastAir ? fmtDate(x.lastAir) : null);
+    if (x.nextEp) add("Next episode", `S${pad(x.nextEp.s)}E${pad(x.nextEp.e)}${x.nextEp.date ? " · " + fmtDate(x.nextEp.date) : " · date not announced"}`);
+    if (x.seasons) add("Size", `${x.seasons} season${x.seasons > 1 ? "s" : ""}${x.episodes ? ` · ${x.episodes} episodes` : ""}`);
+  }
+  add("Status", x.status);
+  add(x.peopleLabel || "Directed by", x.people);
+  add("Writing", x.writers);
+  add("Music", x.music);
+  add(x.companiesLabel || "Studio", x.companies);
+  add("Runtime", w.runtimeMinutes ? (w.type === "SERIES" ? `about ${w.runtimeMinutes} min per episode` : mins(w.runtimeMinutes)) : null);
+  add("Original language", langName(w.originalLanguage));
+  add("Country", (w.countries || []).map(countryName));
+  add(`Certification (${countryName(region())})`, certFor(x) || (Object.keys(x.certs || {}).length ? "Not listed for this country" : null));
+  if (x.budget) add("Budget", "$" + x.budget.toLocaleString("en-US"));
+  if (x.revenue) add("Box office", "$" + x.revenue.toLocaleString("en-US"));
+  const links = [x.trailer ? `<a class="btn" href="${esc(x.trailer)}" target="_blank" rel="noopener">▶ Watch trailer</a>` : "", x.imdb ? `<a class="btn ghost" href="https://www.imdb.com/title/${esc(x.imdb)}/" target="_blank" rel="noopener">IMDb page</a>` : ""].join("");
+  if (!rows.length && !links) return "";
+  return `<div class="card panel"><h3>Details</h3>
+    ${rows.length ? `<dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}
+    ${links ? `<div class="wrap-chips">${links}</div>` : ""}</div>`;
+}
+function backBar(w) {
+  const menu = w ? `<div class="menu"><button class="icon-btn" data-act="menu" data-id="detail" aria-haspopup="true" aria-expanded="${UI.menu === "detail"}" aria-label="More options">${I.more}</button>
+    ${UI.menu === "detail" ? `<div class="menu-pop" role="menu">
+      ${w.isManual ? `<button role="menuitem" data-act="edit-manual" data-id="${esc(w.id)}">Edit details</button>${Catalog.status() === "ready" ? `<button role="menuitem" data-act="link-open" data-id="${esc(w.id)}">Link to catalog entry…</button>` : ""}` : `<button role="menuitem" data-act="refresh" data-id="${esc(w.id)}">Refresh from catalog</button>`}
+      <button role="menuitem" data-act="toggle-anime" data-id="${esc(w.id)}">${w.isAnime ? "Not anime" : "Mark as anime"}</button>
+      ${S.states[w.id] ? `<button role="menuitem" data-act="remove" data-id="${esc(w.id)}" style="color:var(--warn)">Remove from library…</button>` : ""}
+    </div>` : ""}</div>` : "";
+  return `<div style="display:flex;align-items:center;justify-content:space-between;padding-top:calc(4px + env(safe-area-inset-top))"><button class="btn ghost" data-act="back" style="padding-left:6px">${I.back.replace("<svg", '<svg width="22" height="22"')} Back</button>${menu}</div>`;
+}
+function epRow(w, e, isW, t) {
+  const a = airState(e.airDate, t);
+  const hide = S.settings.hideSpoilers && !isW && !UI.reveal[e.id];
+  const menuId = "ep:" + e.id;
+  return `<div class="ep-row ${isW ? "watched" : ""}">
+    <button class="check" role="checkbox" aria-checked="${isW}" ${a === "upcoming" && !isW ? 'disabled title="Not aired yet"' : ""} data-act="ep-toggle" data-id="${esc(w.id)}" data-ep="${esc(e.id)}" aria-label="${esc(epCode(e))} ${isW ? "watched" : "not watched"}">${I.check}</button>
+    <div style="min-width:0;padding-top:4px">
+      <div class="t">${esc(epCode(e))}${e.title ? ` · ${esc(e.title)}` : ""}</div>
+      <div class="meta-line" style="margin-top:4px">
+        ${a === "aired" ? `<span class="small muted">${esc(fmtDate(e.airDate))}</span>` : a === "upcoming" ? `<span class="pill accent">Airs ${esc(relDay(e.airDate))}</span>` : `<span class="pill">Date unknown</span>`}
+        ${e.runtimeMinutes ? `<span class="small muted">${e.runtimeMinutes} min</span>` : ""}${e.isManual && !w.isManual ? '<span class="pill">Manual</span>' : ""}
+      </div>
+      ${e.overview ? (hide ? `<button class="spoiler" data-act="reveal" data-ep="${esc(e.id)}">Synopsis hidden · Show</button>` : `<p class="small" style="margin:6px 0 0;max-width:65ch">${esc(e.overview)}</p>`) : ""}
+    </div>
+    <div class="menu"><button class="icon-btn" data-act="menu" data-id="${esc(menuId)}" aria-haspopup="true" aria-expanded="${UI.menu === menuId}" aria-label="Options for ${esc(epCode(e))}">${I.more}</button>
+      ${UI.menu === menuId ? `<div class="menu-pop" role="menu">
+        <button role="menuitem" data-act="through" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Mark watched up to here…</button>
+        ${e.isManual ? `<button role="menuitem" data-act="ep-edit" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Edit title and date</button>` : ""}
+      </div>` : ""}</div>
+  </div>`;
+}
+function libraryPanel(w, st) {
+  if (!st) {
+    return `<div class="card panel"><h3>Not in your library</h3><p class="small muted" style="margin:0">Save it to track it. Nothing is shared.</p>
+      <div class="wrap-chips"><button class="btn primary" data-act="lib-add-watchlist" data-id="${esc(w.id)}">${I.bookmark.replace("<svg", '<svg width="18" height="18"')} Add to watchlist</button>
+      <button class="btn" data-act="lib-add" data-id="${esc(w.id)}">Add to library</button></div></div>`;
+  }
+  return `<div class="card panel" aria-label="Your library settings for this title">
+    <div class="section-head"><h3 style="flex:1">Your library</h3><button class="link-btn" data-act="help">What's this?</button></div>
+    <div class="field"><span style="font-weight:600">Status</span><div class="seg" role="group" aria-label="Watch status">
+      ${Object.entries(STATUS).map(([k, l]) => `<button data-act="set-status" data-id="${esc(w.id)}" data-v="${k}" aria-pressed="${st.status === k}">${l}</button>`).join("")}</div></div>
+    <div class="field"><span style="font-weight:600">Interest</span><div class="wrap-chips" role="group" aria-label="Interest">
+      ${Object.entries(INTEREST).map(([k, l]) => `<button class="chip" data-act="set-interest" data-id="${esc(w.id)}" data-v="${k}" aria-pressed="${st.interest === k}">${l}</button>`).join("")}</div></div>
+    <div class="toggle-row"><div style="flex:1;font-weight:600">On watchlist</div><button class="switch" role="switch" aria-checked="${!!st.watchlist}" aria-label="On watchlist" data-act="set-watchlist" data-id="${esc(w.id)}"></button></div>
+    <div class="field"><span style="font-weight:600">Your rating <span class="muted" style="font-weight:500">${st.rating ? `· ${st.rating}/10` : "· none"}</span></span>
+      <div class="rating" role="group" aria-label="Private rating from 1 to 10">${Array.from({ length: 10 }, (_, i) => i + 1).map((n) => `<button class="${st.rating && n <= st.rating ? "on" : ""}" data-act="set-rating" data-id="${esc(w.id)}" data-v="${n}" aria-label="Rate ${n} out of 10" aria-pressed="${st.rating === n}">${n}</button>`).join("")}
+      ${st.rating ? `<button style="width:auto;padding:0 10px" data-act="set-rating" data-id="${esc(w.id)}" data-v="0">Clear</button>` : ""}</div></div>
+    <div class="field"><label for="notes">Private notes</label><textarea id="notes" class="input" data-input="notes" data-id="${esc(w.id)}" placeholder="Only you can see this">${esc(st.notes || "")}</textarea>
+      <div id="notes-actions" class="small muted">Saves when you leave the box.</div></div>
+  </div>`;
+}
+
+// ======================================================================
+//  Overlays: sheets, dialogs, toast
+// ======================================================================
+function openModal(m) { UI.modal = m; UI.menu = null; render(); setTimeout(() => { const el = document.querySelector("#overlay [autofocus], #overlay input, #overlay button"); el && el.focus(); }, 0); }
+function closeModal() { UI.modal = null; render(); }
+function renderModal() {
+  const m = UI.modal, root = document.getElementById("overlay");
+  if (!m) { root.innerHTML = ""; return; }
+  let body = "";
+  if (m.type === "confirm") {
+    body = `<h2 id="m-title">${esc(m.title)}</h2><div style="display:grid;gap:8px">${m.body}</div>
+      <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn ${m.danger ? "danger" : "primary"}" data-act="modal-ok" ${m.okDisabled ? "disabled" : ""}>${esc(m.ok)}</button></div>`;
+  } else if (m.type === "manual") body = manualForm(m);
+  else if (m.type === "lib-filters") body = libFilters();
+  else if (m.type === "disc-filters") body = discFilters(m);
+  else if (m.type === "movie-watch") body = `<h2 id="m-title">Mark watched</h2>
+      <div class="field"><label for="mw-date">Date watched</label><input id="mw-date" class="input" type="date" max="${today()}" value="${esc(m.date)}" data-input="mw-date"></div>
+      <label class="toggle-row" style="cursor:pointer"><input type="checkbox" id="mw-re" ${m.rewatch ? "checked" : ""} data-input="mw-re" style="width:22px;height:22px;accent-color:var(--accent)"> <span>This was a rewatch</span></label>
+      <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="movie-watch-save">Save</button></div>`;
+  else if (m.type === "add-eps") body = `<h2 id="m-title">Add episodes</h2>
+      <div class="field"><label for="ae-s">Season (0 for specials)</label><input id="ae-s" class="input" inputmode="numeric" value="${esc(m.season)}" data-input="ae-s"></div>
+      <div class="field"><label for="ae-c">How many episodes</label><input id="ae-c" class="input" inputmode="numeric" value="${esc(m.count)}" data-input="ae-c"></div>
+      <p class="small muted" style="margin:0">They're numbered after any already in that season. Add titles and dates afterwards.</p>
+      <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="add-eps-save">Add</button></div>`;
+  else if (m.type === "ep-edit") body = `<h2 id="m-title">Edit ${esc(m.code)}</h2>
+      <div class="field"><label for="ee-t">Episode title</label><input id="ee-t" class="input" value="${esc(m.title)}" data-input="ee-t"></div>
+      <div class="field"><label for="ee-d">Air date (optional)</label><input id="ee-d" class="input" type="date" value="${esc(m.date)}" data-input="ee-d"><span class="tiny muted">Leave empty if it isn't known.</span></div>
+      <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="ep-edit-save">Save</button></div>`;
+  else if (m.type === "import") body = importSheet(m);
+  else if (m.type === "export") body = `<h2 id="m-title">Export backup</h2>
+      <p class="small muted" style="margin:0">${IN_SANDBOX ? "Pages inside Claude can't download files. Copy the backup and save it as a .json file somewhere other than this device." : "Download the file and keep it somewhere other than this device."}</p>
+      <textarea class="input" readonly style="min-height:160px;font-family:ui-monospace,monospace;font-size:12px" aria-label="Backup data">${esc(m.json)}</textarea>
+      <div class="actions"><button class="btn ghost" data-act="modal-close">Close</button>${IN_SANDBOX ? "" : `<button class="btn" data-act="export-download">Download .json</button>`}<button class="btn primary" data-act="export-copy">Copy</button></div>`;
+  else if (m.type === "link") body = linkSheet(m);
+  else if (m.type === "sync-merge") body = `<h2 id="m-title">Combine your libraries?</h2>
+      <div class="kv num"><span>On this device</span><b>${m.local} titles</b><span>In your cloud backup (${esc(m.email)})</span><b>${m.remote} titles</b><span>On both</span><b>${m.both} titles</b></div>
+      <p style="margin:0">Merging keeps everything from both. Watch history is combined. For status, interest, watchlist, rating and notes, the most recent change wins, field by field. If notes differ on both, the other version is kept for you to review. Nothing is deleted.</p>
+      <p class="small muted" style="margin:0">Choose “Not now” to stay local-only. Nothing changes on this device or in the cloud.</p>
+      <div class="actions"><button class="btn ghost" data-act="sync-merge-cancel">Not now</button><button class="btn primary" data-act="sync-merge-ok">${m.remote ? "Merge both" : "Upload this library"}</button></div>`;
+  else if (m.type === "info") body = `<h2 id="m-title">${esc(m.title)}</h2><div style="display:grid;gap:10px">${m.body}</div><div class="actions"><button class="btn primary" data-act="modal-close">OK</button></div>`;
+  root.innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet fade-in" role="dialog" aria-modal="true" aria-labelledby="m-title">${body}</div></div>`;
+}
+function confirmDlg(title, body, ok, onOk, danger) { openModal({ type: "confirm", title, body, ok, onOk, danger }); }
+
+let toastTimer = null;
+function toast(msg, undo) {
+  const root = document.getElementById("toast-root");
+  clearTimeout(toastTimer);
+  root.innerHTML = `<div class="toast fade-in" role="status"><span>${esc(msg)}</span>${undo ? `<button data-act="undo">Undo</button>` : ""}<button class="x" data-act="toast-close" aria-label="Dismiss">${I.x.replace("<svg", '<svg width="18" height="18"')}</button></div>`;
+  toast.undo = undo || null;
+  toastTimer = setTimeout(() => { root.innerHTML = ""; toast.undo = null; }, undo ? 7000 : 3500);
+}
+
+function manualForm(m) {
+  const f = m.f, e = m.errors || {};
+  const fld = (k, label, attrs = "", hint = "") => `<div class="field"><label for="mf-${k}">${label}</label><input id="mf-${k}" class="input ${e[k] ? "err" : ""}" value="${esc(f[k])}" data-input="mf" data-k="${k}" ${attrs}>${e[k] ? `<span class="err-text">${esc(e[k])}</span>` : hint ? `<span class="tiny muted">${hint}</span>` : ""}</div>`;
+  return `<h2 id="m-title">${m.editId ? "Edit details" : "Add a title"}</h2>
+    <p class="small muted" style="margin:0">Manual titles are labelled as yours and track exactly like catalog titles.</p>
+    ${fld("title", "Title", 'autofocus autocomplete="off"')}
+    ${m.editId ? "" : `<div class="seg" role="group" aria-label="Type">${[["SERIES", "Series"], ["MOVIE", "Movie"]].map(([v, l]) => `<button data-act="mf-type" data-v="${v}" aria-pressed="${f.type === v}">${l}</button>`).join("")}</div>`}
+    <label class="toggle-row" style="cursor:pointer"><input type="checkbox" ${f.isAnime ? "checked" : ""} data-input="mf-anime" style="width:22px;height:22px;accent-color:var(--accent)"> <span>Anime</span></label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${fld("year", "Year", 'inputmode="numeric" maxlength="4"')}
+      ${fld("runtime", f.type === "MOVIE" ? "Runtime (min)" : "Episode length (min)", 'inputmode="numeric" maxlength="4"')}
+      ${fld("lang", "Language code", 'maxlength="3" placeholder="hi, ta, ja"')}
+      ${fld("country", "Country code", 'maxlength="2" placeholder="IN, KR"')}
+    </div>
+    <div class="field"><label for="mf-release">${f.type === "MOVIE" ? "Release date" : "First air date"} (optional)</label><input id="mf-release" class="input ${e.release ? "err" : ""}" type="date" value="${esc(f.release)}" data-input="mf" data-k="release"></div>
+    ${fld("originalTitle", "Original title (optional)")}
+    <div class="field"><label for="mf-overview">Synopsis (optional)</label><textarea id="mf-overview" class="input" data-input="mf" data-k="overview">${esc(f.overview)}</textarea></div>
+    ${!m.editId && f.type === "SERIES" ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${fld("seasons", "Seasons", 'inputmode="numeric"')}${fld("perSeason", "Episodes per season", 'inputmode="numeric"', "Leave empty to add later")}</div>` : ""}
+    <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="mf-save">${m.editId ? "Save" : "Add to library"}</button></div>`;
+}
+function libFilters() {
+  const f = UI.lib, lib = library();
+  const years = [...new Set(lib.map((x) => x.w.year).filter(Boolean))].sort((a, b) => b - a);
+  const langs = [...new Set(lib.map((x) => x.w.originalLanguage).filter(Boolean))].sort();
+  const countries = [...new Set(lib.flatMap((x) => x.w.countries || []))].sort();
+  const genres = [...new Set(lib.flatMap((x) => x.w.genres || []))].sort();
+  const group = (title, key, opts) => opts.length ? `<div class="field"><span style="font-weight:600">${title}</span><div class="wrap-chips">${opts.map(([v, l]) => `<button class="chip" data-act="lib-f" data-k="${key}" data-v="${esc(v)}" aria-pressed="${f[key] === v}">${esc(l)}</button>`).join("")}</div></div>` : "";
+  return `<h2 id="m-title">Filter library</h2>
+    ${group("Watch status", "status", Object.entries(STATUS))}${group("Interest", "interest", Object.entries(INTEREST))}
+    ${group("Year", "year", years.map((y) => [y, String(y)]))}${group("Original language", "lang", langs.map((l) => [l, langName(l)]))}
+    ${group("Country", "country", countries.map((c) => [c, countryName(c)]))}${group("Genre", "genre", genres.map((g) => [g, g]))}
+    <div class="actions"><button class="btn ghost" data-act="lib-clear">Clear all</button><button class="btn primary" data-act="modal-close">Done</button></div>`;
+}
+function discFilters(m) {
+  const g = UI.disc.genres;
+  const chipset = (key, opts) => `<div class="wrap-chips">${opts.map(([v, l]) => `<button class="chip" data-act="df" data-k="${key}" data-v="${esc(v)}" aria-pressed="${m.f[key] === v}">${esc(l)}</button>`).join("")}</div>`;
+  return `<h2 id="m-title">Filters</h2>
+    <div class="field"><label for="df-year">Release year</label><input id="df-year" class="input" inputmode="numeric" maxlength="4" value="${esc(m.f.year)}" data-input="df-year"></div>
+    <div class="field"><span style="font-weight:600">Original language</span>${chipset("lang", LANGS.map((c) => [c, langName(c)]))}</div>
+    <div class="field"><span style="font-weight:600">Country</span>${chipset("country", COUNTRIES.map((c) => [c, countryName(c)]))}</div>
+    ${g.length ? `<div class="field"><span style="font-weight:600">Genre</span>${chipset("genre", g.map((x) => [String(x.id), x.name]))}</div>` : `<p class="small muted">Genres load when the catalog is reachable.</p>`}
+    <div class="actions"><button class="btn ghost" data-act="df-clear">Clear filters</button><button class="btn primary" data-act="df-apply">Apply</button></div>`;
+}
+
+// ======================================================================
+//  Backup: export / import (format "reelnest-export" v1)
+// ======================================================================
+const WORK_KEYS = ["id", "type", "isAnime", "title", "originalTitle", "year", "overview", "posterPath", "backdropPath", "genres", "originalLanguage", "countries", "runtimeMinutes", "releaseDate", "seriesStatus", "provider", "providerId", "isManual", "fetchedAt", "createdAt", "updatedAt"];
+function exportJson() {
+  const pick = (o, ks) => Object.fromEntries(ks.map((k) => [k, o[k] ?? null]));
+  return JSON.stringify({
+    format: "reelnest-export", version: 1, exportedAt: now(), appVersion: "web-0.1",
+    works: Object.values(S.works).map((w) => ({ ...pick(w, WORK_KEYS), genres: w.genres || [], countries: w.countries || [], isAnime: !!w.isAnime, isManual: !!w.isManual })),
+    seasons: Object.values(S.seasons).flat().map((s) => pick(s, ["workId", "number", "name", "episodeCount", "airDate"])),
+    episodes: Object.values(S.episodes).flat().map((e) => ({ ...pick(e, ["id", "workId", "season", "number", "title", "airDate", "runtimeMinutes", "overview", "providerId", "updatedAt"]), isManual: !!e.isManual })),
+    states: Object.values(S.states).map((s) => pick(s, ["workId", "interest", "interestAt", "status", "statusAt", "watchlist", "watchlistAt", "rating", "ratingAt", "notes", "notesAt", "deviceId"])),
+    events: Object.values(S.events).map((e) => pick(e, ["id", "workId", "episodeId", "watchedAt", "isRewatch", "createdAt", "deletedAt", "deviceId"])),
+    tombstones: Object.values(S.tombs),
+    settings: { theme: S.settings.theme.toUpperCase(), catalogLanguage: S.settings.lang, includeSpecials: String(S.settings.includeSpecials), hideSpoilers: String(S.settings.hideSpoilers) },
+  }, null, 2);
+}
+function parseBackup(text) {
+  let o;
+  try { o = JSON.parse(text); } catch { return { errors: ["This isn't a valid JSON file."] }; }
+  if (!o || o.format !== "reelnest-export") return { errors: ["This isn't a ReelNest backup file."] };
+  if (typeof o.version !== "number") return { errors: ["The file has no format version."] };
+  if (o.version > 1) return { errors: [`This file is from a newer ReelNest (format ${o.version}). Update first.`] };
+  const errors = [], arr = (k) => (Array.isArray(o[k]) ? o[k] : []);
+  const ids = new Set();
+  arr("works").forEach((w, i) => {
+    if (!w.id || !w.title) errors.push(`Title #${i + 1} is missing its id or name.`);
+    else if (ids.has(w.id)) errors.push(`Duplicate title id ${w.id}.`);
+    else ids.add(w.id);
+    if (w.type !== "MOVIE" && w.type !== "SERIES") errors.push(`Title #${i + 1} has an unknown type “${w.type}”.`);
+  });
+  arr("states").forEach((s) => {
+    if (!ids.has(s.workId)) errors.push(`Library entry for a missing title (${s.workId}).`);
+    if (!STATUS[s.status]) errors.push(`Unknown status “${s.status}”.`);
+    if (!INTEREST[s.interest]) errors.push(`Unknown interest “${s.interest}”.`);
+    if (s.rating != null && !(s.rating >= 1 && s.rating <= 10)) errors.push("A rating is outside 1–10.");
+  });
+  arr("episodes").forEach((e) => { if (!ids.has(e.workId)) errors.push(`Episode ${e.id} belongs to a missing title.`); });
+  arr("events").forEach((e) => { if (!ids.has(e.workId)) errors.push(`Watch record ${e.id} belongs to a missing title.`); if (typeof e.watchedAt !== "number") errors.push(`Watch record ${e.id} has no date.`); });
+  if (errors.length) return { errors: errors.slice(0, 12) };
+  return { bundle: { works: arr("works"), seasons: arr("seasons"), episodes: arr("episodes"), states: arr("states"), events: arr("events"), tombstones: arr("tombstones"), settings: o.settings || {} } };
+}
+/** Non-destructive plan: per-field merge, union of history, duplicates folded by catalog id (never by title), local deletions respected. */
+function planImport(b) {
+  const byProvider = {};
+  for (const w of Object.values(S.works)) if (w.provider && w.providerId) byProvider[`${w.provider}:${w.type}:${w.providerId}`] = w.id;
+  const map = {}, plan = { works: [], seasons: [], episodes: [], states: [], events: [], conflicts: [] };
+  const pv = { newWorks: 0, sameWorks: 0, dups: 0, newEvents: 0, sameEvents: 0, skippedDeleted: 0 };
+  const inStates = Object.fromEntries(b.states.map((s) => [s.workId, s]));
+  for (const w of b.works) {
+    const tomb = S.tombs[w.id];
+    if (tomb) {
+      const st = inStates[w.id];
+      const edited = st ? Math.max(...FIELDS.map(([, a]) => st[a] || 0)) : 0;
+      if (edited <= tomb.deletedAt) { pv.skippedDeleted++; continue; }
+    }
+    const existing = S.works[w.id];
+    const dup = !existing && w.provider && w.providerId ? byProvider[`${w.provider}:${w.type}:${w.providerId}`] : null;
+    if (existing) { pv.sameWorks++; map[w.id] = w.id; if ((w.updatedAt || 0) > (existing.updatedAt || 0)) plan.works.push(w); }
+    else if (dup) { pv.dups++; map[w.id] = dup; }
+    else { pv.newWorks++; map[w.id] = w.id; plan.works.push(w); }
+  }
+  for (const s of b.seasons) if (map[s.workId]) plan.seasons.push({ ...s, workId: map[s.workId] });
+  for (const e of b.episodes) if (map[e.workId]) plan.episodes.push({ ...e, workId: map[e.workId] });
+  for (const s of b.states) {
+    const id = map[s.workId]; if (!id) continue;
+    const incoming = { ...s, workId: id };
+    const mine = S.states[id];
+    if (!mine) plan.states.push({ ...incoming, addedAt: now() });
+    else { const r = mergeState(mine, incoming); plan.states.push(r.state); plan.conflicts.push(...r.conflicts); }
+  }
+  for (const e of b.events) {
+    const id = map[e.workId]; if (!id) continue;
+    const mine = S.events[e.id];
+    if (mine) { pv.sameEvents++; plan.events.push(mergeEvent(mine, e)); } else { pv.newEvents++; plan.events.push({ ...e, workId: id }); }
+  }
+  return { plan, pv };
+}
+function applyImport(p, includeSettings, settings) {
+  const touched = new Set();
+  for (const w of p.works) { S.works[w.id] = { ...S.works[w.id], ...w }; touched.add(w.id); }
+  const seasonsBy = {};
+  for (const s of p.seasons) (seasonsBy[s.workId] ||= []).push(s);
+  for (const [id, list] of Object.entries(seasonsBy)) {
+    const cur = Object.fromEntries((S.seasons[id] || []).map((s) => [s.number, s]));
+    for (const s of list) cur[s.number] = { ...cur[s.number], ...s };
+    S.seasons[id] = Object.values(cur); touched.add(id);
+  }
+  for (const e of p.episodes) {
+    const list = S.episodes[e.workId] || (S.episodes[e.workId] = []);
+    const i = list.findIndex((x) => x.id === e.id);
+    if (i < 0) list.push(e); else if (e.isManual) list[i] = { ...list[i], ...e };
+    touched.add(e.workId);
+  }
+  for (const s of p.states) { S.states[s.workId] = s; touched.add(s.workId); if (S.tombs[s.workId]) delete S.tombs[s.workId]; }
+  for (const e of p.events) { S.events[e.id] = e; touched.add(e.workId); }
+  if (p.conflicts.length) S.conflicts = [...p.conflicts, ...S.conflicts].slice(0, 50);
+  if (includeSettings) {
+    if (settings.theme) S.settings.theme = settings.theme.toLowerCase() === "system" ? "system" : settings.theme.toLowerCase();
+    if (settings.catalogLanguage) S.settings.lang = settings.catalogLanguage;
+    if (settings.includeSpecials) S.settings.includeSpecials = settings.includeSpecials === "true";
+    if (settings.hideSpoilers) S.settings.hideSpoilers = settings.hideSpoilers === "true";
+    applyTheme();
+  }
+  touched.forEach((id) => Persist.touch(id)); Persist.touchMeta();
+}
+function importSheet(m) {
+  if (m.errors) return `<h2 id="m-title">Can't import this file</h2><ul style="margin:0;padding-left:20px">${m.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul><div class="actions"><button class="btn primary" data-act="import-reset">Try another</button></div>`;
+  if (m.ready) {
+    const v = m.ready.pv;
+    return `<h2 id="m-title">Import preview</h2>
+      <p class="small muted" style="margin:0">Nothing is overwritten. Newer values win field by field, and watch history is combined.</p>
+      <div class="kv num"><span>New titles</span><b>${v.newWorks}</b><span>Titles already here</span><b>${v.sameWorks}</b>
+      ${v.dups ? `<span>Same catalog title under another id (merged)</span><b>${v.dups}</b>` : ""}
+      <span>New watch records</span><b>${v.newEvents}</b><span>Watch records already here</span><b>${v.sameEvents}</b>
+      ${v.skippedDeleted ? `<span>Skipped (you deleted them here)</span><b>${v.skippedDeleted}</b>` : ""}
+      ${m.ready.plan.conflicts.length ? `<span>Items to review after</span><b>${m.ready.plan.conflicts.length}</b>` : ""}</div>
+      <label class="toggle-row" style="cursor:pointer"><input type="checkbox" data-input="imp-settings" ${m.withSettings ? "checked" : ""} style="width:22px;height:22px;accent-color:var(--accent)"> <span>Also import preferences (theme, language, tracking rules)</span></label>
+      <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="import-apply">Import</button></div>`;
+  }
+  return `<h2 id="m-title">Import backup</h2>
+    <p class="small muted" style="margin:0">Choose a ReelNest backup file (.json), or paste its contents.</p>
+    <div class="field"><label for="imp-file">Backup file</label><input id="imp-file" type="file" accept=".json,application/json,text/plain" class="input" data-input="imp-file"></div>
+    <div class="field"><label for="imp-text">Or paste it here</label><textarea id="imp-text" class="input" style="font-family:ui-monospace,monospace;font-size:12px" data-input="imp-text">${esc(m.text || "")}</textarea></div>
+    <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="import-check" ${m.text ? "" : "disabled"}>Preview</button></div>`;
+}
+
+// ======================================================================
+//  Render + routing
+// ======================================================================
+function applyTheme() {
+  const th = S.settings.theme;
+  if (th === "dark" || th === "light") document.documentElement.setAttribute("data-theme", th);
+  else if (!IN_SANDBOX) document.documentElement.removeAttribute("data-theme");
+}
+function render() {
+  const main = document.getElementById("main");
+  const active = document.activeElement;
+  const keepId = active && active.id && main.contains(active) ? active.id : active && active.closest && active.closest("#overlay") && active.id ? active.id : null;
+  const sel = keepId && "selectionStart" in active ? [active.selectionStart, active.selectionEnd] : null;
+  renderNav();
+  main.innerHTML = UI.detail ? viewDetail(UI.detail) : ({ home: viewHome, discover: viewDiscover, library: viewLibrary, calendar: viewCalendar, profile: viewProfile }[UI.tab])();
+  renderModal();
+  if (keepId) {
+    const el = document.getElementById(keepId);
+    if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} }
+  }
+}
+function go(tab) {
+  UI.tab = tab; UI.detail = null; UI.menu = null;
+  if (location.hash !== "#" + tab) history.replaceState(null, "", "#" + tab);
+  render(); window.scrollTo(0, 0);
+  if (tab === "discover" && Catalog.status() === "ready" && !UI.disc.items.length && !UI.disc.loading) discoverReload(false);
+}
+async function openDetail(id) {
+  UI.detail = id; UI.menu = null; render(); window.scrollTo(0, 0);
+  const w = S.works[id];
+  loadWatch(id, false);
+  if (w && !w.isManual && !w.extra && w.providerId && Catalog.status() === "ready") {
+    try { await openCatalogItem({ key: id, type: w.type, providerId: w.providerId }); if (UI.detail === id) render(); } catch {}
+  }
+  if (w && !w.isManual && w.type === "SERIES" && Catalog.status() === "ready") {
+    const err = await ensureEpisodes(id);
+    if (err) toast(Catalog.message(err.code));
+    if (UI.detail === id) render();
+  }
+}
+
+// ======================================================================
+//  Actions
+// ======================================================================
+const act = {
+  tab: (d) => go(d.id),
+  back: () => { UI.detail = null; UI.menu = null; render(); },
+  open: (d) => openDetail(d.id),
+  "remove-demo": () => confirmDlg("Remove demo titles?", `<p style="margin:0">Deletes the made-up demo titles added by an earlier version, with their watch records. Your own titles are not touched.</p>`, "Remove demo titles", () => {
+    for (const w of Object.values(S.works).filter((w) => w.demo)) { removeInternal(w.id); dropWork(w.id); Persist.touch(w.id); }
+    toast("Demo titles removed");
+  }, true),
+  manual: (d) => openModal({ type: "manual", f: { title: d.title || "", type: "SERIES", isAnime: false, year: "", runtime: "", lang: "", country: "", release: "", originalTitle: "", overview: "", seasons: "1", perSeason: "" } }),
+  "edit-manual": (d) => {
+    const w = S.works[d.id];
+    openModal({ type: "manual", editId: d.id, f: { title: w.title, type: w.type, isAnime: w.isAnime, year: w.year ? String(w.year) : "", runtime: w.runtimeMinutes ? String(w.runtimeMinutes) : "",
+      lang: w.originalLanguage || "", country: (w.countries || [])[0] || "", release: w.releaseDate || "", originalTitle: w.originalTitle || "", overview: w.overview || "" } });
+  },
+  "mf-type": (d) => { UI.modal.f.type = d.v; render(); },
+  "mf-save": () => {
+    const m = UI.modal, f = m.f, e = {};
+    if (!f.title.trim()) e.title = "A title is required.";
+    if (f.year && !(/^\d{4}$/.test(f.year) && +f.year >= 1870 && +f.year <= 2100)) e.year = "Enter a 4-digit year.";
+    if (f.runtime && !(+f.runtime >= 1 && +f.runtime <= 1000)) e.runtime = "Minutes from 1 to 1000.";
+    if (f.release && !validISO(f.release)) e.release = "Use a valid date.";
+    if (!m.editId && f.type === "SERIES") {
+      if (f.seasons && !(+f.seasons >= 0 && +f.seasons <= 100)) e.seasons = "0 to 100.";
+      if (f.perSeason && !(+f.perSeason >= 1 && +f.perSeason <= 500)) e.perSeason = "1 to 500.";
+    }
+    if (Object.keys(e).length) { m.errors = e; render(); return; }
+    if (m.editId) {
+      const w = S.works[m.editId];
+      Object.assign(w, { title: f.title.trim(), isAnime: f.isAnime, year: f.year ? +f.year : f.release ? +f.release.slice(0, 4) : null, runtimeMinutes: f.runtime ? +f.runtime : null,
+        originalLanguage: f.lang.trim().toLowerCase() || null, countries: f.country.trim() ? [f.country.trim().toUpperCase()] : [], releaseDate: f.release || null,
+        originalTitle: f.originalTitle.trim() || null, overview: f.overview.trim() || null, updatedAt: now() });
+      Persist.touch(m.editId); closeModal(); toast("Saved");
+      return;
+    }
+    const per = +f.perSeason || 0, n = +f.seasons || 0;
+    const id = createManual({ title: f.title, type: f.type, isAnime: f.isAnime, year: f.year ? +f.year : null, runtime: f.runtime ? +f.runtime : null,
+      lang: f.lang.trim().toLowerCase(), country: f.country.trim().toUpperCase(), releaseDate: f.release || null, originalTitle: f.originalTitle.trim(), overview: f.overview.trim(),
+      seasons: f.type === "SERIES" && per ? Array.from({ length: n }, (_, i) => [i + 1, per]) : [] });
+    UI.modal = null; toast(`Added “${f.title.trim()}”`); openDetail(id);
+  },
+  "watch-next": (d) => {
+    const w = S.works[d.id], ep = (S.episodes[d.id] || []).find((e) => e.id === d.ep);
+    const undo = markEpisodes(d.id, [d.ep]); render(); toast(`${w.title} · ${epCode(ep)} watched`, () => { undo(); render(); });
+  },
+  "ep-toggle": (d) => {
+    const watched = watchedSet(d.id).has(d.ep), ep = S.episodes[d.id].find((e) => e.id === d.ep);
+    const undo = watched ? unmarkEpisodes(d.id, [d.ep]) : markEpisodes(d.id, [d.ep]);
+    render(); toast(`${epCode(ep)} ${watched ? "marked unwatched" : "watched"}`, () => { undo(); render(); });
+  },
+  through: (d) => {
+    const eps = S.episodes[d.id], target = eps.find((e) => e.id === d.ep);
+    bulkConfirm(d.id, `Mark everything up to ${epCode(target)} watched?`, planThrough(eps, target, watchedSet(d.id), today()));
+  },
+  "season-mark": (d) => bulkConfirm(d.id, `Mark ${+d.n === 0 ? "Specials" : "Season " + d.n} watched?`, planSeason(S.episodes[d.id], +d.n, watchedSet(d.id), today())),
+  "season-unmark": (d) => {
+    const ids = S.episodes[d.id].filter((e) => e.season === +d.n).map((e) => e.id);
+    const count = ids.filter((i) => watchedSet(d.id).has(i)).length;
+    confirmDlg(`Mark ${+d.n === 0 ? "Specials" : "Season " + d.n} unwatched?`, `<p style="margin:0">Removes the watch records for ${count} episodes. You can undo right after.</p>`, "Mark unwatched", () => {
+      const undo = unmarkEpisodes(d.id, ids); toast("Season marked unwatched", () => { undo(); render(); });
+    });
+  },
+  "complete-aired": (d) => {
+    const t = today(), w = watchedSet(d.id), incl = S.settings.includeSpecials;
+    const ids = S.episodes[d.id].filter((e) => !w.has(e.id) && airState(e.airDate, t) === "aired" && (!isSpecial(e) || incl)).map((e) => e.id);
+    confirmDlg(`Mark ${ids.length} episodes watched?`, `<p style="margin:0">Adds watch records for every aired episode not yet marked. Future and undated episodes are left alone.</p>`, "Mark watched", () => {
+      const undo = markEpisodes(d.id, ids); toast(`${ids.length} episodes marked watched`, () => { undo(); render(); });
+    });
+  },
+  "season-toggle": (d, el) => { UI.openSeasons[d.key] = el.getAttribute("aria-expanded") !== "true"; render(); },
+  reveal: (d) => { UI.reveal[d.ep] = true; render(); },
+  menu: (d) => { UI.menu = UI.menu === d.id ? null : d.id; render(); },
+  "set-status": (d) => { const u = setField(d.id, "status", d.v); render(); toast(`Status: ${STATUS[d.v]}`, () => { u(); render(); }); },
+  "set-interest": (d) => { const u = setField(d.id, "interest", d.v); render(); toast(`Interest: ${INTEREST[d.v]}`, () => { u(); render(); }); },
+  "set-watchlist": (d) => { const v = !S.states[d.id].watchlist; const u = setField(d.id, "watchlist", v); render(); toast(v ? "Added to watchlist" : "Removed from watchlist", () => { u(); render(); }); },
+  "set-rating": (d) => { const v = +d.v || null; const u = setField(d.id, "rating", v); render(); toast(v ? `Rated ${v}/10` : "Rating cleared", () => { u(); render(); }); },
+  "lib-add": (d) => { ensureState(d.id); Persist.touch(d.id); render(); toast("Added to library"); },
+  "lib-add-watchlist": (d) => { const u = setField(d.id, "watchlist", true); render(); toast("Added to watchlist", () => { u(); render(); }); },
+  "movie-watch": (d) => openModal({ type: "movie-watch", id: d.id, date: today(), rewatch: movieWatches(d.id).length > 0 }),
+  "movie-watch-save": () => {
+    const m = UI.modal;
+    if (!validISO(m.date) || m.date > today()) { toast("Pick a date that isn't in the future."); return; }
+    const u = addMovieWatch(m.id, m.date, m.rewatch); closeModal(); toast("Marked watched", () => { u(); render(); });
+  },
+  "event-del": (d) => { const u = deleteEvent(d.ev); render(); toast("Watch removed", () => { u(); render(); }); },
+  "add-eps": (d) => openModal({ type: "add-eps", id: d.id, season: "1", count: "10" }),
+  "add-eps-save": () => {
+    const m = UI.modal, s = +m.season, c = +m.count;
+    if (!(Number.isInteger(s) && s >= 0 && s <= 200 && Number.isInteger(c) && c >= 1 && c <= 500)) { toast("Season 0–200 and 1–500 episodes."); return; }
+    addEpisodes(m.id, s, c); UI.openSeasons[m.id + "|" + s] = true; closeModal(); toast(`Added ${c} episodes`);
+  },
+  "ep-edit": (d) => { const e = S.episodes[d.id].find((x) => x.id === d.ep); openModal({ type: "ep-edit", id: d.id, ep: d.ep, code: epCode(e), title: e.title || "", date: e.airDate || "" }); },
+  "ep-edit-save": () => {
+    const m = UI.modal;
+    if (m.date && !validISO(m.date)) { toast("That date isn't valid."); return; }
+    const e = S.episodes[m.id].find((x) => x.id === m.ep);
+    e.title = m.title.trim() || null; e.airDate = m.date || null; e.updatedAt = now();
+    Persist.touch(m.id); closeModal();
+  },
+  remove: (d) => confirmDlg("Remove from library?", `<p style="margin:0">Your status, rating, notes and watch history for this title are removed. You can undo right after.</p>`, "Remove", () => {
+    const u = removeFromLibrary(d.id); UI.menu = null; toast("Removed from library", () => { u(); render(); });
+  }, true),
+  "toggle-anime": (d) => { const w = S.works[d.id]; w.isAnime = !w.isAnime; w.updatedAt = now(); Persist.touch(d.id); UI.menu = null; render(); },
+  refresh: async (d) => { UI.menu = null; const w = S.works[d.id]; w.fetchedAt = 0; render(); try { await openCatalogItem({ key: d.id, type: w.type, providerId: w.providerId }); const e = await ensureEpisodes(d.id, true); toast(e ? Catalog.message(e.code) : "Updated from TMDB"); } catch (e) { toast(Catalog.message(e.code)); } render(); },
+  "watch-refresh": (d) => loadWatch(d.id, true),
+  "link-open": (d) => { openModal({ type: "link", id: d.id, q: S.works[d.id].title, items: null }); linkSearch(); },
+  "link-pick": (d) => linkPreview(d.key),
+  "link-back": () => { UI.modal.preview = null; render(); },
+  "link-apply": () => applyLink(),
+  "sb-save": () => {
+    const u = document.getElementById("sb-url").value.trim(), k = document.getElementById("sb-key").value.trim();
+    if (!/^https:\/\/[^\s/]+/.test(u) || k.length < 20) { toast("Enter the project URL (https://…) and the anon key."); return; }
+    storage.set("reelnest.sbUrl", u); storage.set("reelnest.sbKey", k); render(); toast("Cloud backup is available. Sign in to turn it on.");
+  },
+  "sb-send": async () => {
+    const email = document.getElementById("sb-email").value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) { Object.assign(Sync.auth, { msg: "Enter a valid email address.", msgErr: true }); render(); return; }
+    Object.assign(Sync.auth, { email, busy: true, msg: null }); render();
+    try { await Sync.sendCode(email); Object.assign(Sync.auth, { step: "code", busy: false, msg: "Check your email for a 6-digit code or a sign-in link.", msgErr: false }); }
+    catch (e) { Object.assign(Sync.auth, { busy: false, msg: Sync.message(e), msgErr: true }); }
+    render();
+  },
+  "sb-verify": async () => {
+    const code = document.getElementById("sb-code").value.trim();
+    if (!code) return;
+    Object.assign(Sync.auth, { busy: true, msg: null }); render();
+    try { await Sync.verifyCode(Sync.auth.email, code); Object.assign(Sync.auth, { step: "email", busy: false, msg: null }); }
+    catch (e) { Object.assign(Sync.auth, { busy: false, msg: e.code === "request" || e.code === "auth" ? "That code didn't work. Check it, or request a new one." : Sync.message(e), msgErr: true }); }
+    render();
+  },
+  "sb-restart": () => { Object.assign(Sync.auth, { step: "email", msg: null }); render(); },
+  "sb-sync": () => Sync.run(),
+  "sb-signout": () => confirmDlg("Sign out of cloud backup?", `<p style="margin:0">Your library stays on this device and in the cloud. This device just stops syncing until you sign in again.</p>`, "Sign out", () => Sync.signOut()),
+  "sb-delete": () => openModal({ type: "confirm", title: "Delete your cloud copy?", danger: true, ok: "Delete cloud copy", okDisabled: true,
+    body: `<p style="margin:0">Removes your library from the cloud. This device keeps its copy, and you stay signed in, so the next sync uploads this device's library again unless you sign out first.</p>
+      <div class="field"><label for="wipe-t">Type DELETE to confirm</label><input id="wipe-t" class="input" data-input="wipe-t" autocomplete="off"></div>`,
+    onOk: async () => { try { await Sync.deleteCloud(); toast("Cloud copy deleted"); } catch (e) { toast(Sync.message(e)); } } }),
+  "sync-merge-ok": async () => { const m = UI.modal; UI.modal = null; render(); await Sync.link(m.cloud, true); toast("Libraries merged. Cloud backup is on."); },
+  "sync-merge-cancel": async () => { UI.modal = null; await Sync.signOut(); toast("Staying local-only. Nothing was changed."); },
+  "set-region": (d, el) => { S.settings.region = el.value; S.settingsAt = now(); Persist.touchMeta(); render(); toast(`Viewing region: ${countryName(el.value)}`); },
+  rules: () => openModal({ type: "info", title: "How progress is counted", body: `<p style="margin:0">Only episodes with a known air date on or before today count. Future and undated episodes are listed but not counted.</p><p style="margin:0">Specials are ${S.settings.includeSpecials ? "included" : "not included"}. Change this in Profile.</p><p style="margin:0">Choosing a status like Completed never adds or removes episode watches.</p>` }),
+  help: () => openModal({ type: "info", title: "Status, interest and watchlist", body: `<p style="margin:0"><b>Status</b> is where you are with it: not started, watching, completed, on hold or dropped.</p><p style="margin:0"><b>Interest</b> is how you feel about it. Not interested titles stay findable in your library.</p><p style="margin:0"><b>Watchlist</b> is a separate “want to watch” list, so a title can be Interested and on the watchlist at once.</p><p style="margin:0">None of these change which episodes are marked watched.</p>` }),
+  // library
+  "lib-kind": (d) => { UI.lib.kind = d.v; render(); },
+  "lib-wl": () => { UI.lib.watchlist = !UI.lib.watchlist; render(); },
+  "lib-filters": () => openModal({ type: "lib-filters" }),
+  "lib-f": (d) => { const v = d.k === "year" ? +d.v : d.v; UI.lib[d.k] = UI.lib[d.k] === v ? null : v; render(); },
+  "lib-clear": () => { Object.assign(UI.lib, { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null }); UI.modal = null; render(); },
+  "lib-grid": () => { S.settings.grid = !S.settings.grid; S.settingsAt = now(); Persist.touchMeta(); render(); },
+  // discover
+  "disc-type": (d) => { UI.disc.type = d.v; discoverReload(false); },
+  "disc-clear": () => { Object.assign(UI.disc, { q: "", year: "", lang: "", country: "", genre: null }); discoverReload(false); },
+  "disc-retry": () => discoverReload(false),
+  "disc-more": () => discoverFetch(UI.disc.page + 1),
+  "disc-filters": async () => {
+    openModal({ type: "disc-filters", f: { year: UI.disc.year, lang: UI.disc.lang, country: UI.disc.country, genre: UI.disc.genre ? String(UI.disc.genre) : "" } });
+    if (!UI.disc.genres.length) try {
+      const [m, t] = await Promise.all([Catalog.call("genre/movie/list", { language: S.settings.lang }), Catalog.call("genre/tv/list", { language: S.settings.lang })]);
+      const all = {}; for (const g of [...m.genres, ...t.genres]) all[g.id] = g; UI.disc.genres = Object.values(all).sort((a, b) => a.name.localeCompare(b.name)); render();
+    } catch {}
+  },
+  df: (d) => { const f = UI.modal.f; f[d.k] = f[d.k] === d.v ? "" : d.v; render(); },
+  "df-clear": () => { Object.assign(UI.disc, { year: "", lang: "", country: "", genre: null }); closeModal(); discoverReload(false); },
+  "df-apply": () => { const f = UI.modal.f; if (f.year && !/^\d{4}$/.test(f.year)) { toast("Enter a 4-digit year."); return; } Object.assign(UI.disc, { year: f.year, lang: f.lang, country: f.country, genre: f.genre ? +f.genre : null }); closeModal(); discoverReload(false); },
+  "disc-open": async (d) => {
+    const it = UI.disc.items.find((i) => i.key === d.key); UI.disc.opening = d.key; render();
+    try { const id = await openCatalogItem(it); UI.disc.opening = null; openDetail(id); } catch (e) { UI.disc.opening = null; render(); toast(Catalog.message(e.code)); }
+  },
+  "disc-watchlist": async (d) => {
+    const it = UI.disc.items.find((i) => i.key === d.key); UI.disc.opening = d.key; render();
+    try { const id = await openCatalogItem(it); const u = setField(id, "watchlist", true); UI.disc.opening = null; render(); toast(`${it.title} added to watchlist`, () => { u(); render(); }); }
+    catch (e) { UI.disc.opening = null; render(); toast(Catalog.message(e.code)); }
+  },
+  // profile
+  "set-theme": (d) => { S.settings.theme = d.v; S.settingsAt = now(); Persist.touchMeta(); applyTheme(); render(); },
+  "set-toggle": (d) => { S.settings[d.k] = !S.settings[d.k]; S.settingsAt = now(); Persist.touchMeta(); render(); },
+  "save-catalog": () => {
+    const k = document.getElementById("tmdb-key").value.trim(), l = document.getElementById("tmdb-lang").value.trim() || "en-US";
+    const r = document.getElementById("tmdb-relay").value.trim();
+    if (r && !/^https:\/\/[^\s/]+/.test(r)) { toast("The relay address must start with https://"); return; }
+    if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
+    if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
+    Catalog.goodHost = null;
+    S.settings.lang = l; S.settingsAt = now(); Persist.touchMeta(); UI.disc.items = []; UI.disc.genres = []; render(); toast("Catalog settings saved");
+  },
+  "conflict-dismiss": (d) => { S.conflicts.splice(+d.i, 1); Persist.touchMeta(); render(); },
+  export: () => openModal({ type: "export", json: exportJson() }),
+  "export-copy": async () => { try { await navigator.clipboard.writeText(UI.modal.json); toast("Backup copied. Paste it into a .json file to keep it."); } catch { toast("Copy was blocked. Select the text and copy it manually."); } },
+  "export-download": () => {
+    const blob = new Blob([UI.modal.json], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `reelnest-backup-${today()}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  },
+  import: () => openModal({ type: "import", text: "" }),
+  "import-reset": () => { UI.modal = { type: "import", text: "" }; render(); },
+  "import-check": () => {
+    const r = parseBackup(UI.modal.text);
+    UI.modal = r.errors ? { type: "import", errors: r.errors } : { type: "import", ready: planImport(r.bundle), bundle: r.bundle, withSettings: false };
+    render();
+  },
+  "import-apply": () => { const m = UI.modal; applyImport(m.ready.plan, m.withSettings, m.bundle.settings); closeModal(); toast(`Imported ${m.ready.pv.newWorks} new titles`); },
+  wipe: () => openModal({ type: "confirm", title: "Delete all your data?", danger: true, ok: "Delete everything", okDisabled: true, wipe: true,
+    body: `<p style="margin:0">Your library, watch history, ratings, notes and manual titles will be deleted. This can't be undone.</p>
+      <div class="field"><label for="wipe-t">Type DELETE to confirm</label><input id="wipe-t" class="input" data-input="wipe-t" autocomplete="off"></div>`,
+    onOk: () => {
+      const ids = Object.keys(S.works);
+      for (const k of ["works", "seasons", "episodes", "states", "events", "tombs"]) S[k] = {};
+      S.conflicts = [];
+      ids.forEach((id) => Persist.touch(id)); Persist.touchMeta();
+      toast("All data deleted");
+    } }),
+  "modal-close": () => closeModal(),
+  "modal-ok": () => { const m = UI.modal; UI.modal = null; m.onOk(); render(); },
+  scrim: (d, el, ev) => { if (ev.target === el) closeModal(); },
+  undo: () => { const u = toast.undo; document.getElementById("toast-root").innerHTML = ""; toast.undo = null; if (u) u(); },
+  "toast-close": () => { document.getElementById("toast-root").innerHTML = ""; toast.undo = null; },
+};
+function bulkConfirm(id, title, plan) {
+  const body = (inc) => `<p style="margin:0"><b class="num">${plan.mark.length + (inc ? plan.unknown.length : 0)}</b> episodes will be marked watched.</p>
+    ${plan.already ? `<p class="small muted" style="margin:0">${plan.already} already watched stay as they are.</p>` : ""}
+    ${plan.future.length ? `<p class="small muted" style="margin:0">${plan.future.length} future episodes are skipped.</p>` : ""}
+    ${plan.unknown.length ? `<label class="toggle-row" style="cursor:pointer"><input type="checkbox" data-input="bulk-unknown" ${inc ? "checked" : ""} style="width:22px;height:22px;accent-color:var(--accent)"> <span>Also mark ${plan.unknown.length} episodes with no air date</span></label>` : ""}
+    <p class="tiny muted" style="margin:0">Specials are only included when you pick a special.</p>`;
+  const m = { type: "confirm", title, body: body(false), ok: "Mark watched", plan, inc: false, bodyFn: body, okDisabled: !plan.mark.length && !plan.unknown.length,
+    onOk: () => {
+      const list = [...plan.mark, ...(m.inc ? plan.unknown : [])];
+      if (!list.length) return;
+      const u = markEpisodes(id, list.map((e) => e.id)); toast(`${list.length} episodes marked watched`, () => { u(); render(); });
+    } };
+  openModal(m);
+}
+
+// ---------- events ----------
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el) { if (UI.menu && !ev.target.closest(".menu")) { UI.menu = null; render(); } return; }
+  const fn = act[el.dataset.act];
+  if (fn) { if (el.dataset.act !== "scrim") ev.preventDefault(); fn(el.dataset, el, ev); }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") { if (UI.modal) closeModal(); else if (UI.menu) { UI.menu = null; render(); } else if (UI.detail) act.back(); }
+  if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches('[role="button"][data-act]')) { ev.preventDefault(); ev.target.click(); }
+});
+document.addEventListener("input", (ev) => {
+  const el = ev.target, k = el.dataset.input;
+  if (!k) return;
+  const m = UI.modal;
+  if (k === "disc-q") { UI.disc.q = el.value; discoverReload(true); if (Catalog.status() !== "ready") render(); }
+  else if (k === "lib-q") { UI.lib.q = el.value; render(); }
+  else if (k === "lib-sort") { UI.lib.sort = el.value; render(); }
+  else if (k === "mf") m.f[el.dataset.k] = el.value;
+  else if (k === "link-q") { m.q = el.value; clearTimeout(linkTimer); linkTimer = setTimeout(linkSearch, 400); }
+  else if (k === "mf-anime") m.f.isAnime = el.checked;
+  else if (k === "mw-date") m.date = el.value;
+  else if (k === "mw-re") m.rewatch = el.checked;
+  else if (k === "ae-s") m.season = el.value;
+  else if (k === "ae-c") m.count = el.value;
+  else if (k === "ee-t") m.title = el.value;
+  else if (k === "ee-d") m.date = el.value;
+  else if (k === "df-year") m.f.year = el.value.replace(/\D/g, "").slice(0, 4);
+  else if (k === "imp-text") { m.text = el.value; const b = document.querySelector('[data-act="import-check"]'); if (b) b.disabled = !m.text.trim(); }
+  else if (k === "imp-settings") m.withSettings = el.checked;
+  else if (k === "bulk-unknown") { m.inc = el.checked; m.body = m.bodyFn(m.inc); render(); }
+  else if (k === "wipe-t") { const b = document.querySelector('[data-act="modal-ok"]'); if (b) b.disabled = el.value.trim() !== "DELETE"; m.okDisabled = el.value.trim() !== "DELETE"; }
+});
+document.addEventListener("change", (ev) => {
+  const el = ev.target;
+  if (el.dataset.input === "lib-sort") { UI.lib.sort = el.value; render(); }
+  if (el.dataset.actChange && act[el.dataset.actChange]) act[el.dataset.actChange](el.dataset, el);
+  if (el.dataset.input === "imp-file" && el.files && el.files[0]) {
+    const file = el.files[0];
+    if (file.size > 20 * 1024 * 1024) { toast("That file is too large to be a ReelNest backup."); return; }
+    file.text().then((text) => { UI.modal.text = text; act["import-check"](); }).catch(() => toast("Couldn't read that file."));
+  }
+});
+document.addEventListener("focusout", (ev) => {
+  const el = ev.target;
+  if (el.dataset && el.dataset.input === "notes") {
+    const id = el.dataset.id, v = el.value.trim() || null;
+    if (S.states[id] && (S.states[id].notes || null) !== v) { const u = setField(id, "notes", v); toast("Notes saved", () => { u(); render(); }); }
+  }
+});
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h) && (h !== UI.tab || UI.detail)) go(h); });
+
+// ---------- boot ----------
+(function boot() {
+  const h = location.hash.slice(1);
+  if (TABS.some((t) => t[0] === h)) UI.tab = h;
+  render();
+  Persist.init().then(async () => {
+    if (CloudCfg.configured()) { await Sync.consumeRedirect(); if (Sync.active()) Sync.run(); render(); }
+  });
+  if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false);
+  if (!IN_SANDBOX && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+
+// Exposed for automated tests only.
+window.__reelnest = { Sync, createManual, markEpisodes, ensureState, setField, S, UI, progressOf, upNextOf, planThrough, planSeason, mergeState, parseBackup, planImport, exportJson, epOrder, airState };
+</script>
+</body>
+</html>
