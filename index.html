@@ -968,7 +968,8 @@ const Sync = {
 
   // ---------- sign-in ----------
   async sendCode(email) {
-    await this.http("/auth/v1/otp", { method: "POST", body: JSON.stringify({ email, create_user: true }) }, false);
+    const back = encodeURIComponent(location.origin + location.pathname);
+    await this.http("/auth/v1/otp?redirect_to=" + back, { method: "POST", body: JSON.stringify({ email, create_user: true }) }, false);
   },
   async verifyCode(email, token) {
     const r = await this.http("/auth/v1/verify", { method: "POST", body: JSON.stringify({ type: "email", email, token }) }, false);
@@ -979,6 +980,15 @@ const Sync = {
   /** Magic-link and Google sign-in return tokens in the URL fragment. */
   async consumeRedirect() {
     const h = location.hash.slice(1);
+    if (h.includes("error_code=") || h.includes("error=")) {
+      const e = new URLSearchParams(h);
+      history.replaceState(null, "", location.pathname + "#profile");
+      UI.tab = "profile";
+      const expired = e.get("error_code") === "otp_expired";
+      Object.assign(this.auth, { step: "email", busy: false, msgErr: true,
+        msg: expired ? "That sign-in link was already used or has expired. Each link works once. Send a new one below." : "Sign-in didn't complete (" + (e.get("error_description") || e.get("error") || "unknown error") + "). Please try again." });
+      return true;
+    }
     if (!h.includes("access_token=")) return false;
     const p = new URLSearchParams(h);
     history.replaceState(null, "", location.pathname + "#profile");
@@ -1595,11 +1605,13 @@ function syncCard(storageLine) {
   if (!Sync.signedIn() || !Sync.active()) {
     const a = Sync.auth;
     const form = a.step === "code"
-      ? `<div class="field"><label for="sb-code">Code from the email sent to ${esc(a.email)}</label><input id="sb-code" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></div>
-         <div class="wrap-chips"><button class="btn primary" data-act="sb-verify" ${a.busy ? "disabled" : ""}>${a.busy ? "Checking…" : "Sign in"}</button><button class="btn ghost" data-act="sb-restart">Use another email</button></div>
-         <p class="tiny muted" style="margin:0">You can also tap the link in the email on this device.</p>`
+      ? `<p class="small" style="margin:0">We sent a sign-in link to <b>${esc(a.email)}</b>. Tap it on this device; it brings you back here signed in.</p>
+         <div class="wrap-chips"><button class="btn ghost" data-act="sb-restart">Send again / use another email</button></div>
+         <details><summary class="small muted">The email has a code instead?</summary>
+           <div style="display:grid;gap:8px;margin-top:8px"><div class="field"><label for="sb-code">Code from the email</label><input id="sb-code" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></div>
+           <div><button class="btn" data-act="sb-verify" ${a.busy ? "disabled" : ""}>${a.busy ? "Checking…" : "Sign in with code"}</button></div></div></details>`
       : `<div class="field"><label for="sb-email">Email</label><input id="sb-email" class="input" type="email" autocomplete="email" value="${esc(a.email)}"></div>
-         <div class="wrap-chips"><button class="btn primary" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in code"}</button>
+         <div class="wrap-chips"><button class="btn primary" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in link"}</button>
          ${CloudCfg.google() ? `<a class="btn" href="${esc(Sync.googleUrl())}">Continue with Google</a>` : ""}</div>`;
     return `<div class="card panel"><div><b>Local only</b> <span class="pill">Cloud backup off</span></div>${localWarn}
       <p class="small muted" style="margin:0">Sign in to back up and sync. An account is optional; everything works without one. If this device already has titles, you'll be asked how to merge them. Nothing is replaced.</p>
@@ -2230,7 +2242,7 @@ const act = {
     const email = document.getElementById("sb-email").value.trim();
     if (!/^\S+@\S+\.\S+$/.test(email)) { Object.assign(Sync.auth, { msg: "Enter a valid email address.", msgErr: true }); render(); return; }
     Object.assign(Sync.auth, { email, busy: true, msg: null }); render();
-    try { await Sync.sendCode(email); Object.assign(Sync.auth, { step: "code", busy: false, msg: "Check your email for a 6-digit code or a sign-in link.", msgErr: false }); }
+    try { await Sync.sendCode(email); Object.assign(Sync.auth, { step: "code", busy: false, msg: "Check your email and tap the sign-in link. Open it in this same browser. Each link works once.", msgErr: false }); }
     catch (e) { Object.assign(Sync.auth, { busy: false, msg: Sync.message(e), msgErr: true }); }
     render();
   },
