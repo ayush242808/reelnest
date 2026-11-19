@@ -4,5 +4,5 @@
 window.REELNEST_CONFIG = {
   supabaseUrl: "https://gedkntwwjrpfklgvbjtp.supabase.co",
   supabaseAnonKey: "sb_publishable_IAguwzSvnD_1DqFE_LIv9g_aPIBhm_z", // publishable key (public)
-  googleSignIn: false,   // true only after enabling Google in Supabase › Authentication › Providers
+  googleSignIn: true,    // Google provider enabled in Supabase › Authentication › Providers
 };

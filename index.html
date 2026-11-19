@@ -1611,8 +1611,8 @@ function syncCard(storageLine) {
            <div style="display:grid;gap:8px;margin-top:8px"><div class="field"><label for="sb-code">Code from the email</label><input id="sb-code" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></div>
            <div><button class="btn" data-act="sb-verify" ${a.busy ? "disabled" : ""}>${a.busy ? "Checking…" : "Sign in with code"}</button></div></div></details>`
       : `<div class="field"><label for="sb-email">Email</label><input id="sb-email" class="input" type="email" autocomplete="email" value="${esc(a.email)}"></div>
-         <div class="wrap-chips"><button class="btn primary" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in link"}</button>
-         ${CloudCfg.google() ? `<a class="btn" href="${esc(Sync.googleUrl())}">Continue with Google</a>` : ""}</div>`;
+         <div class="wrap-chips">${CloudCfg.google() ? `<a class="btn primary" href="${esc(Sync.googleUrl())}">Continue with Google</a>` : ""}<button class="btn ${CloudCfg.google() ? "" : "primary"}" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in link"}</button></div>
+         ${CloudCfg.google() ? `<p class="tiny muted" style="margin:0">Use the same Google account on every device and your library stays in sync.</p>` : ""}`;
     return `<div class="card panel"><div><b>Local only</b> <span class="pill">Cloud backup off</span></div>${localWarn}
       <p class="small muted" style="margin:0">Sign in to back up and sync. An account is optional; everything works without one. If this device already has titles, you'll be asked how to merge them. Nothing is replaced.</p>
       ${form}${a.msg ? `<p class="small" role="status" style="margin:0;color:${a.msgErr ? "var(--warn)" : "var(--ink-muted)"}">${esc(a.msg)}</p>` : ""}
