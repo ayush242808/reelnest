@@ -2243,7 +2243,9 @@ const act = {
     if (!/^\S+@\S+\.\S+$/.test(email)) { Object.assign(Sync.auth, { msg: "Enter a valid email address.", msgErr: true }); render(); return; }
     Object.assign(Sync.auth, { email, busy: true, msg: null }); render();
     try { await Sync.sendCode(email); Object.assign(Sync.auth, { step: "code", busy: false, msg: "Check your email and tap the sign-in link. Open it in this same browser. Each link works once.", msgErr: false }); }
-    catch (e) { Object.assign(Sync.auth, { busy: false, msg: Sync.message(e), msgErr: true }); }
+    catch (e) { Object.assign(Sync.auth, { busy: false, msgErr: true, msg: e && e.code === "ratelimited"
+      ? "Too many sign-in emails for now (the free email service allows about 2 per hour). Use the newest link already in your inbox, or try again in an hour."
+      : Sync.message(e) }); }
     render();
   },
   "sb-verify": async () => {
