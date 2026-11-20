@@ -71,7 +71,7 @@ h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; le
 /* ---------- app shell ---------- */
 .shell { display: grid; grid-template-columns: 1fr; min-height: 100%; }
 .side { display: none; }
-main { padding: 0 16px calc(96px + env(safe-area-inset-bottom)); max-width: 1120px; width: 100%; margin: 0 auto; }
+main { padding: 0 16px calc(96px + env(safe-area-inset-bottom)); max-width: 1120px; width: 100%; min-width: 0; margin: 0 auto; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: calc(16px + env(safe-area-inset-top)) 0 12px; }
 .topbar h1 { font-size: 30px; font-weight: 800; flex: 1; }
 .tabbar {
@@ -388,6 +388,11 @@ details summary { cursor: pointer; font-weight: 600; }
 }
 @media (prefers-reduced-motion: reduce) { .dtile, .dtile .poster, .dtile-wl { transition: none; } .dtile { transform: none; } }
 
+.drow-sec { margin-top: 14px; min-width: 0; max-width: 100%; }
+.drow { position: relative; min-width: 0; max-width: 100%; display: grid; grid-auto-flow: column; grid-auto-columns: 160px; gap: 16px; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; padding: 10px 6px 12px; margin: 0 -6px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.drow > [role="listitem"] { min-width: 0; scroll-snap-align: start; }
+@media (max-width: 520px) { .drow { grid-auto-columns: 138px; gap: 12px; } }
 /* ---------- date picker ---------- */
 .datefield { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .datefield .icon-btn { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -465,7 +470,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=15"></script>
+<script src="config.js?v=16"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -633,7 +638,8 @@ const UI = {
   watch: {}, link: null, histAll: {},
   tab: "home", detail: null, openSeasons: {}, menu: null, modal: null, loading: true, loadNote: null, saveError: null,
   lib: { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null, sort: "updated" },
-  disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null },
+  disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null,
+    seeAll: false, rows: { trending: [], india: [], indiaTv: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null },
   reveal: {},
 };
 const DEVICE = (() => { const k = "reelnest.device"; let d = storage.get(k); if (!d) { d = "web-" + uuid().slice(0, 8); storage.set(k, d); } return d; })();
@@ -916,7 +922,10 @@ const Catalog = {
     if (this.key()) return sh ? [...direct, sh + "/3/"] : direct;
     return sh ? [sh + "/3/"] : direct;
   },
-  goodHost: null,
+  /** The address that last worked, remembered for 3 days so a blocked one (up to 9 s each) isn't retried on every load. */
+  goodHost: (() => { try { const v = JSON.parse(storage.get("reelnest.apiHost") || "null"); return v && v.at > Date.now() - 3 * 864e5 ? v.host : null; } catch { return null; } })(),
+  rememberHost(host) { if (this.goodHost === host) return; this.goodHost = host; storage.set("reelnest.apiHost", JSON.stringify({ host, at: Date.now() })); },
+  forgetHost() { this.goodHost = null; storage.del("reelnest.apiHost"); },
   /** Every place a TMDB image can come from, best first. Some Indian networks block image.tmdb.org but not media.themoviedb.org. */
   imgs(path, size = "w342") {
     if (!path || IN_SANDBOX) return [];
@@ -948,7 +957,7 @@ const Catalog = {
         const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 9000);
         res = await fetch(url, { headers, signal: ctrl.signal });
         clearTimeout(timer);
-        this.goodHost = host;
+        this.rememberHost(host);
         break;
       } catch (e) { res = null; /* blocked, reset or timed out: try the next host */ }
     }
@@ -1128,7 +1137,7 @@ const Sync = {
     if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
     if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
     storage.set("reelnest.tmdbAt", String(+c.at));
-    Catalog.goodHost = null; UI.disc.items = []; UI.disc.genres = [];
+    Catalog.forgetHost(); UI.disc.items = []; UI.disc.genres = [];
     return true;
   },
   markAll() { for (const id of Object.keys(S.works)) this.outbox[id] = (this.outbox[id] || 0) + 1; this.outbox.__meta = 1; this.saveOutbox(); },
@@ -1507,7 +1516,8 @@ function viewDiscover() {
   h += `<div class="chips" style="margin-top:12px" role="group" aria-label="Type">
     ${[["all", "All"], ["movie", "Movies"], ["tv", "Series"]].map(([v, l]) => `<button class="chip" data-act="disc-type" data-v="${v}" aria-pressed="${d.type === v}">${l}</button>`).join("")}
     <button class="chip" data-act="disc-filters">${I.sliders.replace("<svg", '<svg width="18" height="18"')} Filters${active ? ` (${active})` : ""}</button>
-    ${active || d.q ? `<button class="chip" data-act="disc-clear">Clear all</button>` : ""}</div>`;
+    ${active || d.q || d.seeAll ? `<button class="chip" data-act="disc-clear">${d.seeAll && !active && !d.q ? "Back to Discover" : "Clear all"}</button>` : ""}</div>`;
+  if (discIsHome()) return h + discHomeRows();
   if (d.filteredLocally) h += `<p class="small muted" style="margin:4px 0">Language, country and genre narrow each page of search results, so some pages look short.</p>`;
   if (d.loading && !d.items.length) return h + skeleton();
   if (d.error && !d.items.length) return h + emptyBlock(d.error === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.error),
@@ -1515,11 +1525,58 @@ function viewDiscover() {
   if (!d.items.length) return h + emptyBlock(d.q ? `No match for “${d.q}”` : "No titles for these filters",
     "TMDB doesn't list everything. Try another spelling or the original title, or add it yourself.",
     `<button class="btn primary" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
-  h += `${!d.q && !active ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">Trending this week</h2></div>` : `<h2 class="sr">Results</h2>`}<div class="dgrid">`;
+  const heading = d.q ? "" : d.seeTitle || (!active ? (d.type === "movie" ? "Trending movies this week" : d.type === "tv" ? "Trending series this week" : "Trending this week") : "");
+  h += `${heading ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">${esc(heading)}</h2></div>` : `<h2 class="sr">Results</h2>`}<div class="dgrid">`;
   h += d.items.map(discTile).join("");
   h += `</div>`;
   if (d.page < d.pages) h += `<div style="display:flex;justify-content:center;margin:16px 0"><button class="btn" data-act="disc-more" ${d.loading ? "disabled" : ""}>${d.loading ? "Loading…" : "Load more"}</button></div>`;
   h += `<div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-act="manual" data-title="${esc(d.q)}">Can't find it? Add it manually</button>
+    <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
+  return h;
+}
+// ---------- Discover home: rows shown instantly from a saved copy, refreshed in the background once a day ----------
+const DISC_ROWS = [
+  { k: "trending", title: "Trending this week", path: "trending/all/week" },
+  { k: "india", title: "Popular Indian movies", path: "discover/movie", forced: "MOVIE", params: { with_origin_country: "IN", sort_by: "popularity.desc", "vote_count.gte": 10 } },
+  { k: "indiaTv", title: "Popular Indian series", path: "discover/tv", forced: "SERIES", params: { with_origin_country: "IN", sort_by: "popularity.desc", "vote_count.gte": 5 } },
+  { k: "anime", title: "Popular anime", path: "discover/tv", forced: "SERIES", params: { with_genres: 16, with_original_language: "ja", sort_by: "popularity.desc", "vote_count.gte": 20 } },
+];
+const DISC_TTL = 864e5; // refresh at most once a day
+const discIsHome = () => { const d = UI.disc; return !d.q.trim() && d.type === "all" && !d.seeAll && ![d.year, d.lang, d.country, d.genre].some(Boolean); };
+const discCacheKey = () => `${S.settings.lang}|${region()}`;
+function discCacheRead() {
+  try { const c = JSON.parse(storage.get("reelnest.discCache") || "null"); return c && c.v === 1 && c.key === discCacheKey() ? c : null; } catch { return null; }
+}
+function discFind(key) { const d = UI.disc; return d.items.find((i) => i.key === key) || Object.values(d.rows).flat().find((i) => i.key === key); }
+async function discoverHome(force) {
+  const d = UI.disc, c = discCacheRead();
+  if (c && !d.rowsAt) { d.rows = { ...d.rows, ...c.rows }; d.rowsAt = c.at; }
+  const fresh = d.rowsAt && d.rowsAt > now() - DISC_TTL && DISC_ROWS.every((r) => (d.rows[r.k] || []).length);
+  if (!force && fresh) { render(); return; }
+  if (d.rowsLoading) return;
+  d.rowsLoading = true; d.rowsError = null; render();
+  const lang = S.settings.lang;
+  const res = await Promise.allSettled(DISC_ROWS.map((r) => Catalog.call(r.path, { language: lang, include_adult: "false", ...(r.params || {}) })
+    .then((x) => (x.results || []).map((it) => Catalog.item(it, r.forced)).filter(Boolean))));
+  d.rowsLoading = false;
+  const got = {};
+  res.forEach((r, i) => { if (r.status === "fulfilled" && r.value.length) got[DISC_ROWS[i].k] = r.value; });
+  if (!Object.keys(got).length) { d.rowsError = (res[0].reason && res[0].reason.code) || "network"; render(); return; }
+  d.rows = { ...d.rows, ...got }; d.rowsAt = now();
+  // Save only a complete set, so a partial answer is retried next time instead of being kept for a day.
+  if (DISC_ROWS.every((r) => got[r.k])) storage.set("reelnest.discCache", JSON.stringify({ v: 1, key: discCacheKey(), at: d.rowsAt, rows: d.rows }));
+  render();
+}
+function discHomeRows() {
+  const d = UI.disc, any = DISC_ROWS.some((r) => (d.rows[r.k] || []).length);
+  if (!any && d.rowsLoading) return skeleton();
+  if (!any && d.rowsError) return emptyBlock(d.rowsError === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.rowsError),
+    `<button class="btn primary" data-act="disc-refresh">Try again</button><button class="btn" data-act="manual">Add manually</button>`);
+  let h = DISC_ROWS.filter((r) => (d.rows[r.k] || []).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
+      <div class="section-head"><h2 id="row-${r.k}" style="font-size:19px;flex:1">${r.title}</h2><button class="link-btn" data-act="disc-see" data-k="${r.k}">See all</button></div>
+      <div class="drow" role="list">${d.rows[r.k].map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`).join("");
+  h += `<div style="display:grid;gap:8px;margin-top:8px"><button class="btn" data-act="manual">Can't find it? Add it manually</button>
+    <p class="tiny muted" style="margin:0">${d.rowsLoading ? "Updating…" : d.rowsAt ? `Updated ${esc(relTime(d.rowsAt))}. ` : ""}${!d.rowsLoading ? `<button class="link-btn" data-act="disc-refresh">Refresh now</button>` : ""}</p>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
   return h;
 }
@@ -1546,6 +1603,7 @@ let discTimer = null, discSeq = 0;
 function discoverReload(debounce) {
   clearTimeout(discTimer);
   if (Catalog.status() !== "ready") { render(); return; }
+  if (discIsHome()) { discSeq++; UI.disc.loading = false; discoverHome(false); return; }
   discTimer = setTimeout(() => discoverFetch(1), debounce ? 380 : 0);
 }
 async function discoverFetch(page) {
@@ -1571,8 +1629,8 @@ async function discoverFetch(page) {
       items = [...(m?.results || []).map((x) => Catalog.item(x, "MOVIE")), ...(t?.results || []).map((x) => Catalog.item(x, "SERIES"))].filter(Boolean);
       pages = Math.max(m?.total_pages || 1, t?.total_pages || 1);
     } else {
-      const r = await Catalog.call("trending/all/week", { page, language: lang });
-      items = r.results.map((x) => Catalog.item(x)).filter(Boolean); pages = r.total_pages;
+      const r = await Catalog.call(`trending/${d.type === "movie" ? "movie" : d.type === "tv" ? "tv" : "all"}/week`, { page, language: lang });
+      items = r.results.map((x) => Catalog.item(x, d.type === "movie" ? "MOVIE" : d.type === "tv" ? "SERIES" : null)).filter(Boolean); pages = r.total_pages;
     }
     if (seq !== discSeq) return;
     const seen = new Set(d.items.map((i) => i.key));
@@ -2587,7 +2645,7 @@ function go(tab) {
   UI.tab = tab; UI.detail = null; UI.menu = null;
   if (location.hash !== "#" + tab) history.replaceState(null, "", "#" + tab);
   render(); window.scrollTo(0, 0);
-  if (tab === "discover" && Catalog.status() === "ready" && !UI.disc.items.length && !UI.disc.loading) discoverReload(false);
+  if (tab === "discover" && Catalog.status() === "ready" && (discIsHome() || (!UI.disc.items.length && !UI.disc.loading))) discoverReload(false);
 }
 async function openDetail(id) {
   UI.detail = id; UI.menu = null; render(); window.scrollTo(0, 0);
@@ -2789,8 +2847,17 @@ const act = {
   "lib-clear": () => { Object.assign(UI.lib, { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null }); UI.modal = null; render(); },
   "lib-grid": () => { S.settings.grid = !S.settings.grid; S.settingsAt = now(); Persist.touchMeta(); render(); },
   // discover
-  "disc-type": (d) => { UI.disc.type = d.v; discoverReload(false); },
-  "disc-clear": () => { Object.assign(UI.disc, { q: "", year: "", lang: "", country: "", genre: null }); discoverReload(false); },
+  "disc-type": (d) => { UI.disc.type = d.v; UI.disc.seeTitle = null; if (d.v === "all" && !UI.disc.year && !UI.disc.lang && !UI.disc.country && !UI.disc.genre) UI.disc.seeAll = false; discoverReload(false); },
+  "disc-clear": () => { Object.assign(UI.disc, { q: "", type: "all", year: "", lang: "", country: "", genre: null, seeAll: false, seeTitle: null, items: [] }); discoverReload(false); window.scrollTo(0, 0); },
+  "disc-refresh": () => discoverHome(true),
+  "disc-see": (d) => {
+    const row = DISC_ROWS.find((r) => r.k === d.k), D = UI.disc;
+    Object.assign(D, { seeAll: true, seeTitle: row.title, items: [], q: "", year: "", lang: "", country: "", genre: null, type: "all" });
+    if (d.k === "india") Object.assign(D, { type: "movie", country: "IN" });
+    if (d.k === "indiaTv") Object.assign(D, { type: "tv", country: "IN" });
+    if (d.k === "anime") Object.assign(D, { type: "tv", genre: 16, lang: "ja" });
+    window.scrollTo(0, 0); discoverReload(false);
+  },
   "disc-retry": () => discoverReload(false),
   "disc-more": () => discoverFetch(UI.disc.page + 1),
   "disc-filters": async () => {
@@ -2802,13 +2869,13 @@ const act = {
   },
   df: (d) => { const f = UI.modal.f; f[d.k] = f[d.k] === d.v ? "" : d.v; render(); },
   "df-clear": () => { Object.assign(UI.disc, { year: "", lang: "", country: "", genre: null }); closeModal(); discoverReload(false); },
-  "df-apply": () => { const f = UI.modal.f; if (f.year && !/^\d{4}$/.test(f.year)) { toast("Enter a 4-digit year."); return; } Object.assign(UI.disc, { year: f.year, lang: f.lang, country: f.country, genre: f.genre ? +f.genre : null }); closeModal(); discoverReload(false); },
+  "df-apply": () => { const f = UI.modal.f; if (f.year && !/^\d{4}$/.test(f.year)) { toast("Enter a 4-digit year."); return; } Object.assign(UI.disc, { year: f.year, lang: f.lang, country: f.country, genre: f.genre ? +f.genre : null, seeTitle: null }); closeModal(); discoverReload(false); },
   "disc-open": async (d) => {
-    const it = UI.disc.items.find((i) => i.key === d.key); UI.disc.opening = d.key; render();
+    const it = discFind(d.key); UI.disc.opening = d.key; render();
     try { const id = await openCatalogItem(it); UI.disc.opening = null; openDetail(id); } catch (e) { UI.disc.opening = null; render(); toast(Catalog.message(e.code)); }
   },
   "disc-watchlist": async (d) => {
-    const it = UI.disc.items.find((i) => i.key === d.key);
+    const it = discFind(d.key);
     if (S.states[d.key] && S.states[d.key].watchlist) {
       const u = setField(d.key, "watchlist", false); render(); toast(`${it.title} removed from watchlist`, () => { u(); render(); }); return;
     }
@@ -2827,7 +2894,7 @@ const act = {
     if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
     if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
     if (changed) storage.set("reelnest.tmdbAt", String(now()));
-    Catalog.goodHost = null;
+    Catalog.forgetHost();
     S.settings.lang = l; S.settingsAt = now(); Persist.touchMeta(); UI.disc.items = []; UI.disc.genres = []; render(); toast("Catalog settings saved");
   },
   "conflict-dismiss": (d) => { S.conflicts.splice(+d.i, 1); Persist.touchMeta(); render(); },
@@ -2907,7 +2974,7 @@ document.addEventListener("input", (ev) => {
   const el = ev.target, k = el.dataset.input;
   if (!k) return;
   const m = UI.modal;
-  if (k === "disc-q") { UI.disc.q = el.value; discoverReload(true); if (Catalog.status() !== "ready") render(); }
+  if (k === "disc-q") { UI.disc.q = el.value; UI.disc.seeTitle = null; discoverReload(true); if (Catalog.status() !== "ready") render(); }
   else if (k === "lib-q") { UI.lib.q = el.value; render(); }
   else if (k === "lib-sort") { UI.lib.sort = el.value; render(); }
   else if (k === "mf") m.f[el.dataset.k] = el.value;

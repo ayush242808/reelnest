@@ -176,8 +176,9 @@ with sync_playwright() as p:
     lt = tiles.nth(3).locator(".dtile-meta .t")
     lh = pg.evaluate("(el) => parseFloat(getComputedStyle(el).lineHeight)", lt.element_handle())
     check("tiles: long title clamped to two lines", lt.bounding_box()["height"] <= lh * 2 + 2, (lt.bounding_box()["height"], lh))
+    pg.locator("[data-act=disc-see][data-k=trending]").click(); pg.wait_for_timeout(900); tiles = pg.locator(".dtile")
     cols = pg.evaluate("getComputedStyle(document.querySelector('.dgrid')).gridTemplateColumns.split(' ').length")
-    check("tiles: desktop grid has 5+ columns", cols >= 5, cols)
+    check("tiles: 'See all' opens a desktop grid with 5+ columns", cols >= 5 and tiles.count() == 5, cols)
     # watchlist button
     wl = tiles.nth(0).locator(".dtile-wl")
     wl.click(); pg.wait_for_timeout(900)
@@ -228,7 +229,7 @@ with sync_playwright() as p:
 
     for (w, h, name, mn) in [(820, 1180, "tablet", 4), (375, 812, "phone", 2)]:
         ctx, pg, errs = new_page(b, w, h, mobile=(w < 800), dark=(w > 800))
-        go_discover(pg)
+        go_discover(pg); pg.locator("[data-act=disc-see][data-k=trending]").click(); pg.wait_for_timeout(900)
         cols = pg.evaluate("getComputedStyle(document.querySelector('.dgrid')).gridTemplateColumns.split(' ').length")
         check(f"tiles: {name} layout has {mn}+ columns, no sideways scroll", cols >= mn and no_sideways(pg), cols)
         if w < 800:
