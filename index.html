@@ -2480,7 +2480,7 @@ function applyTheme() {
 }
 // ---------- Google sign-in button (Google Identity Services) ----------
 const Gsi = {
-  loading: null, failed: false,
+  loading: null, failed: false, raw: null,
   load() {
     if (window.google && google.accounts && google.accounts.id) return Promise.resolve();
     if (this.loading) return this.loading;
@@ -2498,13 +2498,18 @@ const Gsi = {
     slot.dataset.mounted = "1";
     try {
       await this.load();
-      // A fresh nonce for every button: Google signs its hash into the token, Supabase checks it against the raw value.
-      const raw = uuid() + uuid();
-      const dig = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-      const hashed = [...new Uint8Array(dig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      // Initialise once per sign-in attempt. Google signs the nonce's hash into the token; Supabase checks it against the raw value.
+      if (!this.raw) {
+        const raw = uuid() + uuid();
+        const dig = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+        const hashed = [...new Uint8Array(dig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+        if (!this.raw) {
+          this.raw = raw;
+          google.accounts.id.initialize({ client_id: CloudCfg.googleId(), nonce: hashed, callback: (resp) => Gsi.done(resp, raw), ux_mode: "popup", itp_support: true, use_fedcm_for_button: true, auto_select: false });
+        }
+      }
       const target = document.getElementById("gsi-btn");
       if (!target) return;
-      google.accounts.id.initialize({ client_id: CloudCfg.googleId(), nonce: hashed, callback: (resp) => Gsi.done(resp, raw), ux_mode: "popup", itp_support: true, use_fedcm_for_button: true, auto_select: false });
       target.innerHTML = ""; target.removeAttribute("aria-busy");
       const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
       google.accounts.id.renderButton(target, { type: "standard", theme: dark ? "filled_black" : "outline", size: "large", text: "continue_with", shape: "pill", logo_alignment: "left", width: Math.max(220, Math.min(340, target.clientWidth || 300)) });
@@ -2515,6 +2520,7 @@ const Gsi = {
   },
   async done(resp, raw) {
     if (!resp || !resp.credential) return;
+    this.raw = null; // a nonce is single-use; the next button gets a fresh one
     Object.assign(Sync.auth, { busy: true, msg: "Signing in with Google…", msgErr: false }); render();
     try { await Sync.googleIdToken(resp.credential, raw); Object.assign(Sync.auth, { busy: false, msg: "" }); }
     catch (e) { Object.assign(Sync.auth, { busy: false, msgErr: true, msg: "Google sign-in didn't complete: " + Sync.message(e) }); }

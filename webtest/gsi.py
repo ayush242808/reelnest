@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 exec(open('/home/claude/webtest/features.py').read().split("reset_db()\nwith sync_playwright()")[0])
 FAKE_GSI = r"""
 window.google = { accounts: { id: {
-  initialize(cfg) { window.__gsiCfg = cfg; },
+  initialize(cfg) { window.__gsiCfg = cfg; window.__gsiInits = (window.__gsiInits || 0) + 1; },
   renderButton(el, opts) {
     const b = document.createElement('button'); b.id = 'fake-google'; b.textContent = 'Continue with Google'; b.dataset.theme = opts.theme;
     b.onclick = () => window.__gsiCfg.callback({ credential: 'hdr.' + btoa(JSON.stringify({ aud: window.__gsiCfg.client_id, nonce: window.__gsiCfg.nonce, email: 'ayush@example.com' })) + '.sig' });
@@ -55,6 +55,7 @@ with sync_playwright() as p:
         pg.locator("[data-act=theme]").first.click() if pg.locator("[data-act=theme]").count() else None
         pg.wait_for_timeout(300)
         check("button survives re-renders", pg.locator("#fake-google").count() == 1, pg.locator("#gsi-btn").inner_html()[:200])
+        check("Google initialised only once across re-renders", pg.evaluate("window.__gsiInits") == 1, pg.evaluate("window.__gsiInits"))
         pg.locator("#fake-google").click(); pg.wait_for_timeout(1500)
         check("token sent to Supabase with the matching raw nonce", seen.get("nonce_ok") is True and seen.get("provider") == "google", seen)
         merge = pg.locator("[data-act=sync-merge-ok]")
