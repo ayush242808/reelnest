@@ -111,12 +111,13 @@ def visible_card(pg, sel):
 def sign_in(pg, email="ayush@example.com"):
     tab(pg, "profile")
     pg.fill("#sb-email", email); pg.click("[data-act=sb-send]"); pg.wait_for_timeout(300)
+    pg.click("details summary:has-text('code instead')")
     pg.fill("#sb-code", "123456"); pg.click("[data-act=sb-verify]"); pg.wait_for_timeout(900)
 
 def add_panchayat(pg):
     tab(pg, "discover"); pg.wait_for_timeout(500)
     pg.fill("#disc-q", "Panchayat"); pg.wait_for_timeout(900)
-    pg.locator(".result .tile", has_text="Panchayat").first.click(); pg.wait_for_timeout(1200)
+    pg.locator(".dtile .dtile-open", has_text="Panchayat").first.click(); pg.wait_for_timeout(1200)
     if pg.locator("[data-act=lib-add]").count(): pg.click("[data-act=lib-add]"); pg.wait_for_timeout(200)
 
 reset_db()
@@ -143,7 +144,7 @@ with sync_playwright() as p:
     tab(pg, "profile"); pg.select_option("#region", "IN"); pg.wait_for_timeout(200)
     # title with no provider data
     tab(pg, "discover"); pg.fill("#disc-q", "Obscure"); pg.wait_for_timeout(900)
-    pg.locator(".result .tile", has_text="Obscure Film").first.click(); pg.wait_for_timeout(1200)
+    pg.locator(".dtile .dtile-open", has_text="Obscure Film").first.click(); pg.wait_for_timeout(1200)
     sec = pg.locator(".card", has_text="Where to watch in India")
     check("2 no-data title says 'No providers found' without claiming unavailability", "No providers found" in sec.inner_text() and "doesn't mean it can't be watched" in sec.inner_text())
     # provider error + retry

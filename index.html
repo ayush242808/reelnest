@@ -317,6 +317,129 @@ a.btn { text-decoration: none; color: inherit; }
 .cal-day h3 { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); font-family: var(--font-body); padding: 6px 6px 2px; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; }
 details summary { cursor: pointer; font-weight: 600; }
+
+/* ---------- cast ---------- */
+.cast-row { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 116px; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity; padding: 2px 2px 8px; margin: 0 -2px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.cast-row:focus-visible { outline-offset: 4px; }
+.cast { position: relative; display: grid; gap: 8px; align-content: start; scroll-snap-align: start; min-width: 0; }
+.cast-photo { position: relative; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.cast-photo img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+.cast-photo .ini { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 6px; color: var(--ink-muted);
+  font-family: var(--font-display); font-weight: 800; font-size: 28px; letter-spacing: .02em; background: linear-gradient(160deg, var(--surface-2), var(--surface)); }
+.cast-photo .ini svg { width: 34px; height: 34px; opacity: .55; }
+.cast-name { font-weight: 700; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+.cast-role { font-size: 13px; color: var(--ink-muted); line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.scroll-btns { display: none; gap: 4px; }
+@media (hover: hover) and (pointer: fine) { .scroll-btns { display: flex; } }
+.scroll-btns .icon-btn { width: 36px; height: 36px; border: 1px solid var(--line); }
+.scroll-btns .icon-btn svg { width: 18px; height: 18px; }
+
+/* ---------- discover tiles ---------- */
+.dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 16px; margin-top: 8px; }
+@media (max-width: 420px) { .dgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; } }
+@media (min-width: 1100px) { .dgrid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); } }
+.dtile { position: relative; min-width: 0; border-radius: 18px; transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform .45s cubic-bezier(.2, .8, .2, 1); will-change: transform; }
+.dtile-open { display: grid; gap: 10px; width: 100%; min-width: 0; padding: 0; border: 0; background: none; text-align: left; border-radius: 16px; color: inherit; }
+.dtile .poster { border-radius: 16px; border: 1px solid var(--line); transition: box-shadow .35s ease, border-color .35s ease; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.dtile .poster::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(to bottom, rgba(0,0,0,.42), transparent 30%, transparent 70%, rgba(0,0,0,.18)); }
+.dtile-meta { display: grid; gap: 2px; padding: 0 2px; min-width: 0; }
+.dtile-meta .t { font-weight: 700; font-size: 15px; line-height: 1.28; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.dtile-meta .sub { font-size: 13px; color: var(--ink-muted); display: flex; flex-wrap: wrap; gap: 0 6px; }
+.dtile-meta .sub b { font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+.dtile-meta .lang { font-size: 12.5px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtile-wl { position: absolute; z-index: 3; top: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid rgba(255,255,255,.22); background: rgba(14, 13, 12, .58); color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: background .15s, transform .12s, color .15s; }
+.dtile-wl svg { width: 19px; height: 19px; }
+.dtile-wl:hover { background: rgba(14, 13, 12, .78); transform: scale(1.06); }
+.dtile-wl[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.dtile-wl[aria-pressed="true"] svg path { fill: currentColor; }
+.dtile-wl[disabled] { opacity: .7; cursor: progress; }
+.dtile-badge { position: absolute; z-index: 3; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px;
+  border-radius: 999px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; background: rgba(14, 13, 12, .62); color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.dtile-badge.on { background: var(--accent); color: var(--accent-ink); }
+.dtile-badge svg { width: 12px; height: 12px; }
+.dtile-busy { position: absolute; z-index: 4; inset: 0 0 auto 0; aspect-ratio: 2/3; display: grid; place-items: center; border-radius: 16px;
+  background: rgba(10, 9, 8, .55); color: #fff; font-weight: 700; font-size: 14px; }
+.dtile-open:focus-visible { outline: none; }
+.dtile-open:focus-visible .poster { box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--accent); }
+.dtile-wl:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 50%; }
+@media (hover: hover) and (pointer: fine) {
+  .dtile:hover .poster { border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+    box-shadow: 0 18px 38px rgba(0,0,0,.38), 0 0 26px color-mix(in srgb, var(--accent) 26%, transparent); }
+  :root[data-theme="light"] .dtile:hover .poster { box-shadow: 0 16px 32px rgba(40,28,10,.18), 0 0 22px color-mix(in srgb, var(--accent) 22%, transparent); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .dtile:hover { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px); }
+  .dtile.tilting { transition: transform .12s ease-out; }
+}
+@media (prefers-reduced-motion: reduce) { .dtile, .dtile .poster, .dtile-wl { transition: none; } .dtile { transform: none; } }
+
+/* ---------- date picker ---------- */
+.datefield { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.datefield .icon-btn { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.datefield .icon-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.cal { background: var(--surface-2); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; }
+:root[data-theme="light"] .cal { background: var(--surface); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .cal { background: var(--surface); } }
+.cal-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; }
+.cal-head .icon-btn { width: 40px; height: 40px; color: var(--ink); }
+.cal-head .icon-btn:hover { color: var(--accent); }
+.cal-head .icon-btn[disabled] { opacity: .3; cursor: not-allowed; background: none; color: var(--ink); }
+.cal-title { justify-self: center; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 8px 12px; border-radius: 12px;
+  font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--ink); }
+.cal-title:hover { background: var(--surface); color: var(--accent); }
+.cal-title svg { width: 16px; height: 16px; transition: transform .15s; }
+.cal-title[aria-expanded="true"] svg { transform: rotate(180deg); }
+.cal-grid { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
+.cal-grid th { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); padding: 2px 0 6px; }
+.cal-grid td { padding: 0; text-align: center; }
+.cal-day-btn { position: relative; width: 100%; max-width: 46px; aspect-ratio: 1; min-height: 40px; border: 0; border-radius: 12px; background: none;
+  color: var(--ink); font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; display: inline-grid; place-items: center; }
+.cal-day-btn:hover:not([disabled]) { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+:root[data-theme="light"] .cal-day-btn:hover:not([disabled]) { background: var(--surface-2); }
+.cal-day-btn.out { color: var(--ink-muted); opacity: .45; }
+.cal-day-btn[disabled] { color: var(--ink-muted); opacity: .28; cursor: not-allowed; }
+.cal-day-btn.today { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); }
+.cal-day-btn.today::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
+.cal-day-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent); }
+.cal-day-btn[aria-pressed="true"]:hover { background: var(--accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent); }
+.cal-day-btn.today[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent-ink), 0 0 0 2px var(--accent); }
+.cal-day-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cal-months button { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 14px; }
+.cal-months button:hover:not([disabled]) { border-color: var(--accent); }
+.cal-months button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.cal-months button[disabled] { opacity: .35; cursor: not-allowed; }
+.cal-years { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; }
+.cal-foot { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding-top: 2px; }
+.cal-foot .btn { min-height: 38px; padding: 0 14px; }
+
+/* ---------- watch source ---------- */
+.src-group { display: grid; gap: 10px; }
+.src-sub { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-muted); }
+.src-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.src { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px 8px 8px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--surface); text-align: left; font-weight: 600; font-size: 14px; line-height: 1.2; min-width: 0; transition: border-color .15s, background .15s; }
+.src:hover { border-color: var(--ink-muted); }
+.src[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.src > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.src-ico { position: relative; width: 34px; height: 34px; flex: none; border-radius: 9px; overflow: hidden; display: grid; place-items: center;
+  background: var(--surface-2); color: var(--ink); }
+.src-ico svg { width: 20px; height: 20px; }
+.src-ico img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
+.src[aria-checked="true"] .src-ico { color: var(--accent); }
+.src.unofficial .src-ico { color: var(--ink); }
+.src-tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 3px; border-radius: 999px; background: var(--surface-2); font-size: 13px; font-weight: 600; max-width: 100%; }
+.src-tag .src-ico { width: 22px; height: 22px; border-radius: 6px; background: var(--surface); }
+.src-tag .src-ico svg { width: 14px; height: 14px; }
+.hist { display: grid; }
+.hist-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.hist-row:first-child { border-top: 0; padding-top: 0; }
+.hist-row .meta-line { margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -393,6 +516,13 @@ const I = {
   bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
   sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>',
+  right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>',
+  person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.4-3.8 4.2-5.6 7.5-5.6s6.1 1.8 7.5 5.6"/></svg>',
+  ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14.5 5v2.2M14.5 10.9v2.2M14.5 16.8V19"/></svg>',
+  screen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/><path d="m10.5 8.2 3.8 2.3-3.8 2.3z" fill="currentColor"/></svg>',
+  skull: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c-4 0-6.8 2.7-6.8 6.3 0 2.1 1 3.6 2.3 4.6v2.1h9v-2.1c1.3-1 2.3-2.5 2.3-4.6 0-3.6-2.8-6.3-6.8-6.3z"/><circle cx="9.4" cy="9.6" r="1.5" fill="currentColor"/><circle cx="14.6" cy="9.6" r="1.5" fill="currentColor"/><path d="M11.2 12.6h1.6M10 15.8v1.6M14 15.8v1.6"/><path d="m4 17.5 16 3.5M20 17.5 4 21"/></svg>',
 };
 
 // ======================================================================
@@ -468,7 +598,7 @@ function mergeState(local, remote, since = 0) {
 }
 function mergeEvent(a, b) {
   const del = [a.deletedAt, b.deletedAt].filter((x) => x != null);
-  return { ...a, deletedAt: del.length ? Math.min(...del) : null };
+  return { ...a, watchedDate: a.watchedDate || b.watchedDate || null, source: a.source || b.source || null, deletedAt: del.length ? Math.min(...del) : null };
 }
 
 // ======================================================================
@@ -490,7 +620,7 @@ const S = {
   settingsAt: 0, // when preferences last changed (for cloud merge)
 };
 const UI = {
-  watch: {}, link: null,
+  watch: {}, link: null, histAll: {},
   tab: "home", detail: null, openSeasons: {}, menu: null, modal: null, loading: true, loadNote: null, saveError: null,
   lib: { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null, sort: "updated" },
   disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null },
@@ -620,6 +750,17 @@ function dropWork(id) {
 const activeEvents = (workId) => Object.values(S.events).filter((e) => e.workId === workId && e.deletedAt == null);
 const watchedSet = (workId) => new Set(activeEvents(workId).map((e) => e.episodeId).filter(Boolean));
 const movieWatches = (workId) => activeEvents(workId).filter((e) => !e.episodeId).sort((a, b) => b.watchedAt - a.watchedAt);
+/** The calendar day a watch happened. Stored as a plain date so it never shifts with time zones; older records fall back to their timestamp. */
+const evDate = (e) => (e.watchedDate && validISO(e.watchedDate) ? e.watchedDate : dayOfMillis(e.watchedAt));
+/** Timestamp used only for ordering: the exact moment for "today", otherwise midday of the chosen day. */
+const atFor = (iso) => (iso === today() ? now() : new Date(iso + "T12:00:00").getTime());
+const SOURCE_KINDS = ["theater", "ott", "other", "unofficial"];
+function cleanSource(src) {
+  if (!src || !SOURCE_KINDS.includes(src.kind)) return null;
+  if (src.kind === "ott") return src.name ? { kind: "ott", id: src.id ?? null, name: String(src.name).slice(0, 80), logo: src.logo || null } : null;
+  if (src.kind === "other") { const n = String(src.name || "").trim().slice(0, 80); return n ? { kind: "other", name: n } : null; }
+  return { kind: src.kind };
+}
 
 function ensureState(id) {
   if (!S.states[id]) {
@@ -646,7 +787,7 @@ function markEpisodes(id, epIds, at = now()) {
   const s = ensureState(id);
   const prevStatus = s.status;
   const have = watchedSet(id);
-  const created = epIds.filter((e) => !have.has(e)).map((e) => ({ id: uuid(), workId: id, episodeId: e, watchedAt: at, isRewatch: false, createdAt: now(), deletedAt: null, deviceId: DEVICE }));
+  const created = epIds.filter((e) => !have.has(e)).map((e) => ({ id: uuid(), workId: id, episodeId: e, watchedAt: at, watchedDate: dayOfMillis(at), isRewatch: false, source: null, createdAt: now(), deletedAt: null, deviceId: DEVICE }));
   for (const e of created) S.events[e.id] = e;
   if (s.status === "NOT_STARTED" && created.length) { s.status = "WATCHING"; s.statusAt = now(); }
   Persist.touch(id);
@@ -666,13 +807,34 @@ function unmarkEpisodes(id, epIds) {
   Persist.touch(id);
   return () => { for (const e of removed) { const c = { ...e, id: uuid(), createdAt: now(), deletedAt: null, deviceId: DEVICE }; S.events[c.id] = c; } Persist.touch(id); };
 }
-function addMovieWatch(id, dateIso, rewatch) {
-  ensureState(id);
-  const at = dateIso === today() ? now() : new Date(dateIso + "T12:00:00").getTime();
-  const e = { id: uuid(), workId: id, episodeId: null, watchedAt: at, isRewatch: !!rewatch, createdAt: now(), deletedAt: null, deviceId: DEVICE };
+function addMovieWatch(id, dateIso, rewatch, source) { return addWatch(id, null, dateIso, rewatch, source); }
+/** One watch of a movie or a single episode, with its calendar date and optional source. */
+function addWatch(id, epId, dateIso, rewatch, source) {
+  const existed = !!S.states[id];
+  const s = ensureState(id);
+  const prevStatus = s.status;
+  const e = { id: uuid(), workId: id, episodeId: epId || null, watchedAt: atFor(dateIso), watchedDate: dateIso, isRewatch: !!rewatch, source: cleanSource(source), createdAt: now(), deletedAt: null, deviceId: DEVICE };
   S.events[e.id] = e;
+  if (epId && s.status === "NOT_STARTED") { s.status = "WATCHING"; s.statusAt = now(); }
   Persist.touch(id);
-  return () => { S.events[e.id] = { ...e, deletedAt: now() }; Persist.touch(id); };
+  return () => {
+    S.events[e.id] = { ...e, deletedAt: now() };
+    if (!existed) removeInternal(id);
+    else if (S.states[id] && S.states[id].status !== prevStatus) { S.states[id].status = prevStatus; S.states[id].statusAt = now(); }
+    Persist.touch(id);
+  };
+}
+/** History is append-only: an edit closes the old record and adds a corrected copy (synced devices agree on it). */
+function editWatch(evId, dateIso, rewatch, source) {
+  const old = S.events[evId];
+  if (!old) return () => {};
+  const t = now();
+  const sameDay = evDate(old) === dateIso;
+  const c = { ...old, id: uuid(), watchedAt: sameDay ? old.watchedAt : atFor(dateIso), watchedDate: dateIso, isRewatch: !!rewatch, source: cleanSource(source), createdAt: t, deletedAt: null, deviceId: DEVICE };
+  S.events[evId] = { ...old, deletedAt: t };
+  S.events[c.id] = c;
+  Persist.touch(old.workId);
+  return () => { const t2 = now(); S.events[c.id] = { ...c, deletedAt: t2 }; const r = { ...old, id: uuid(), createdAt: t2, deletedAt: null }; S.events[r.id] = r; Persist.touch(old.workId); };
 }
 function deleteEvent(evId) {
   const e = S.events[evId];
@@ -812,16 +974,18 @@ const Catalog = {
         genres: (m.genres || []).map((g) => g.name), originalLanguage: m.original_language,
         countries: [...new Set([...(m.origin_country || []), ...(m.production_countries || []).map((c) => c.iso_3166_1)])],
         runtimeMinutes: m.runtime || null, releaseDate: d, seriesStatus: m.status, provider: "tmdb", providerId: item.providerId, isManual: false,
-        fetchedAt: now(), createdAt: now(), updatedAt: now(), cast: (m.credits?.cast || []).slice(0, 12).map((c) => c.name),
+        fetchedAt: now(), createdAt: now(), updatedAt: now(), cast: (m.credits?.cast || []).slice(0, 20).map((c) => ({ id: c.id, name: c.name, character: (c.character || "").trim() || null, profile: c.profile_path || null })).filter((c) => c.name),
         altTitles: [...new Set((m.alternative_titles?.titles || []).map((x) => x.title))].slice(0, 20), extra: this.extra(m, "MOVIE") }, seasons: [] };
     }
-    const t = await this.call("tv/" + item.providerId, { language: lang, append_to_response: "credits,alternative_titles,content_ratings,videos,external_ids", include_video_language: "en,hi,null" });
+    const t = await this.call("tv/" + item.providerId, { language: lang, append_to_response: "credits,aggregate_credits,alternative_titles,content_ratings,videos,external_ids", include_video_language: "en,hi,null" });
     const d = this.date(t.first_air_date);
     return { work: { id, type: "SERIES", isAnime: (t.genres || []).some((g) => g.id === 16) && t.original_language === "ja", title: t.name || t.original_name,
       originalTitle: t.original_name, year: d ? +d.slice(0, 4) : null, overview: t.overview || null, posterPath: t.poster_path, backdropPath: t.backdrop_path,
       genres: (t.genres || []).map((g) => g.name), originalLanguage: t.original_language, countries: t.origin_country || [],
       runtimeMinutes: (t.episode_run_time || []).find((x) => x > 0) || null, releaseDate: d, seriesStatus: t.status, provider: "tmdb", providerId: item.providerId,
-      isManual: false, fetchedAt: now(), createdAt: now(), updatedAt: now(), cast: (t.credits?.cast || []).slice(0, 12).map((c) => c.name),
+      isManual: false, fetchedAt: now(), createdAt: now(), updatedAt: now(), cast: (t.aggregate_credits?.cast || []).length
+        ? t.aggregate_credits.cast.slice(0, 20).map((c) => ({ id: c.id, name: c.name, character: (c.roles || []).map((r) => r.character).filter(Boolean).slice(0, 2).join(" / ") || null, profile: c.profile_path || null })).filter((c) => c.name)
+        : (t.credits?.cast || []).slice(0, 20).map((c) => ({ id: c.id, name: c.name, character: (c.character || "").trim() || null, profile: c.profile_path || null })).filter((c) => c.name),
       altTitles: [...new Set((t.alternative_titles?.results || []).map((x) => x.title))].slice(0, 20), extra: this.extra(t, "SERIES") },
       seasons: (t.seasons || []).map((s) => ({ workId: id, number: s.season_number, name: s.name, episodeCount: s.episode_count, airDate: this.date(s.air_date) })) };
   },
@@ -860,9 +1024,11 @@ const Catalog = {
       providerId: String(e.id), isManual: false, updatedAt: now() }));
   },
 };
+/** Titles saved by older versions stored cast as bare names; they are refreshed once to get photos and roles. */
+const legacyCast = (w) => (w.cast || []).some((c) => typeof c === "string");
 async function openCatalogItem(item) {
   const cached = S.works[item.key];
-  if (cached && cached.fetchedAt > now() - 7 * 864e5 && cached.extra) return item.key;
+  if (cached && cached.fetchedAt > now() - 7 * 864e5 && cached.extra && !legacyCast(cached)) return item.key;
   try {
     const d = await Catalog.details(item);
     S.works[item.key] = { ...d.work, createdAt: cached?.createdAt || d.work.createdAt, isAnime: cached ? cached.isAnime : d.work.isAnime };
@@ -908,8 +1074,10 @@ const camelState = (r) => ({ workId: r.work_id, interest: r.interest, interestAt
   watchlistAt: +r.watchlist_at, rating: r.rating ?? null, ratingAt: +r.rating_at, notes: r.notes ?? null, notesAt: +r.notes_at, deviceId: r.device_id || "", addedAt: +r.added_at || 0 });
 const snakeState = (s) => ({ work_id: s.workId, interest: s.interest, interest_at: s.interestAt || 0, status: s.status, status_at: s.statusAt || 0, watchlist: !!s.watchlist,
   watchlist_at: s.watchlistAt || 0, rating: s.rating ?? null, rating_at: s.ratingAt || 0, notes: s.notes ?? null, notes_at: s.notesAt || 0, device_id: s.deviceId || DEVICE, added_at: s.addedAt || 0 });
-const camelEvent = (r) => ({ id: r.id, workId: r.work_id, episodeId: r.episode_id ?? null, watchedAt: +r.watched_at, isRewatch: !!r.is_rewatch, createdAt: +r.created_at, deletedAt: r.deleted_at == null ? null : +r.deleted_at, deviceId: r.device_id || "" });
-const snakeEvent = (e) => ({ id: e.id, work_id: e.workId, episode_id: e.episodeId ?? null, watched_at: e.watchedAt, is_rewatch: !!e.isRewatch, created_at: e.createdAt, deleted_at: e.deletedAt ?? null, device_id: e.deviceId || DEVICE });
+const camelEvent = (r) => ({ id: r.id, workId: r.work_id, episodeId: r.episode_id ?? null, watchedAt: +r.watched_at, watchedDate: r.watched_date && validISO(r.watched_date) ? r.watched_date : null,
+  isRewatch: !!r.is_rewatch, source: cleanSource(r.source), createdAt: +r.created_at, deletedAt: r.deleted_at == null ? null : +r.deleted_at, deviceId: r.device_id || "" });
+const snakeEvent = (e) => ({ id: e.id, work_id: e.workId, episode_id: e.episodeId ?? null, watched_at: e.watchedAt, watched_date: e.watchedDate || null, is_rewatch: !!e.isRewatch,
+  source: e.source || null, created_at: e.createdAt, deleted_at: e.deletedAt ?? null, device_id: e.deviceId || DEVICE });
 const lastEdit = (st) => Math.max(...FIELDS.map(([, a]) => st[a] || 0));
 
 const Sync = {
@@ -1262,7 +1430,7 @@ function viewHome() {
   if (wl.length) h += section("On your watchlist", `<div class="shelf">${wl.map((x) => tile(x.w)).join("")}</div>`);
   if (recent.length) h += section("Recent activity", `<div class="row-list">${recent.map((e) => {
     const w = S.works[e.workId], ep = e.episodeId ? (S.episodes[w.id] || []).find((x) => x.id === e.episodeId) : null;
-    return `<button class="row" data-act="open" data-id="${esc(w.id)}"><div style="width:48px">${poster(w)}</div><div><div class="t">${esc(w.title)}</div><div class="small muted">${ep ? esc(epCode(ep)) : e.isRewatch ? "Rewatched" : "Watched"} · ${esc(relDay(dayOfMillis(e.watchedAt)))}</div></div><span></span></button>`;
+    return `<button class="row" data-act="open" data-id="${esc(w.id)}"><div style="width:48px">${poster(w)}</div><div><div class="t">${esc(w.title)}</div><div class="small muted">${ep ? esc(epCode(ep)) : e.isRewatch ? "Rewatched" : "Watched"} · ${esc(relDay(evDate(e)))}</div></div><span></span></button>`;
   }).join("")}</div>`);
   return h;
 }
@@ -1301,23 +1469,32 @@ function viewDiscover() {
   if (!d.items.length) return h + emptyBlock(d.q ? `No match for “${d.q}”` : "No titles for these filters",
     "TMDB doesn't list everything. Try another spelling or the original title, or add it yourself.",
     `<button class="btn primary" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
-  const inLib = new Set(Object.keys(S.states));
-  h += `${!d.q && !active ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">Trending this week</h2></div>` : ""}<div style="display:grid;gap:2px;margin-top:6px">`;
-  h += d.items.map((it) => `<div class="result">
-      <button class="tile" style="width:64px" data-act="disc-open" data-key="${esc(it.key)}" aria-label="Open ${esc(it.title)}">${poster({ id: it.key, title: it.title, type: it.type, year: it.year, posterPath: it.posterPath, isAnime: it.anime })}</button>
-      <button class="tile" style="gap:2px" data-act="disc-open" data-key="${esc(it.key)}">
-        <span class="t">${esc(it.title)}</span>
-        ${it.originalTitle ? `<span class="small muted">${esc(it.originalTitle)}</span>` : ""}
-        <span class="small muted">${esc([it.year, it.type === "MOVIE" ? "Movie" : "Series", langName(it.lang), it.countries[0] && countryName(it.countries[0])].filter(Boolean).join(" · "))}</span>
-        <span class="meta-line">${it.anime ? '<span class="pill">Anime?</span>' : ""}${inLib.has(it.key) ? '<span class="pill accent">In library</span>' : ""}</span>
-      </button>
-      ${d.opening === it.key ? '<span class="small muted">Opening…</span>' : inLib.has(it.key) ? "" : `<button class="icon-btn" data-act="disc-watchlist" data-key="${esc(it.key)}" aria-label="Add ${esc(it.title)} to watchlist">${I.bookmark}</button>`}
-    </div>`).join("");
+  h += `${!d.q && !active ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">Trending this week</h2></div>` : `<h2 class="sr">Results</h2>`}<div class="dgrid">`;
+  h += d.items.map(discTile).join("");
   h += `</div>`;
   if (d.page < d.pages) h += `<div style="display:flex;justify-content:center;margin:16px 0"><button class="btn" data-act="disc-more" ${d.loading ? "disabled" : ""}>${d.loading ? "Loading…" : "Load more"}</button></div>`;
   h += `<div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-act="manual" data-title="${esc(d.q)}">Can't find it? Add it manually</button>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
   return h;
+}
+/** Poster-first Discover tile: the poster opens the title; the bookmark is a separate button so it never opens it by accident. */
+function discTile(it) {
+  const st = S.states[it.key], onWl = !!(st && st.watchlist), inLib = !!st, busy = UI.disc.opening === it.key;
+  const kind = it.type === "MOVIE" ? "Movie" : it.anime ? "Anime" : "Series";
+  const where = [langName(it.lang), it.countries[0] && countryName(it.countries[0])].filter(Boolean);
+  const label = `${it.title}${it.year ? ", " + it.year : ""}, ${kind}${onWl ? ", on your watchlist" : inLib ? ", in your library" : ""}`;
+  return `<article class="dtile">
+    <button class="dtile-open" data-act="disc-open" data-key="${esc(it.key)}" aria-label="Open ${esc(label)}">
+      ${poster({ id: it.key, title: it.title, type: it.type, year: it.year, posterPath: it.posterPath, isAnime: it.anime })}
+      <span class="dtile-meta"><span class="t">${esc(it.title)}</span>
+        <span class="sub">${it.year ? `<span class="num">${it.year}</span><span aria-hidden="true">·</span>` : ""}<b>${kind}</b></span>
+        ${where.length ? `<span class="lang">${esc(where.join(" · "))}</span>` : ""}</span>
+    </button>
+    ${onWl ? `<span class="dtile-badge on" aria-hidden="true">${I.bookmark.replace('stroke-width="2"', 'stroke-width="2.4"')}Watchlist</span>` : inLib ? `<span class="dtile-badge" aria-hidden="true">${I.check}In library</span>` : ""}
+    <button class="dtile-wl" data-act="disc-watchlist" data-key="${esc(it.key)}" aria-pressed="${onWl}" ${busy ? "disabled" : ""}
+      aria-label="${onWl ? "Remove " + esc(it.title) + " from watchlist" : "Add " + esc(it.title) + " to watchlist"}" title="${onWl ? "On your watchlist" : "Add to watchlist"}">${I.bookmark}</button>
+    ${busy ? `<span class="dtile-busy" role="status">Opening…</span>` : ""}
+  </article>`;
 }
 let discTimer = null, discSeq = 0;
 function discoverReload(debounce) {
@@ -1707,17 +1884,22 @@ function viewDetail(id) {
       h += `</div>`;
     }
     h += `</div>`;
+    const evs = activeEvents(id).filter((e) => e.episodeId).sort((a, b) => b.watchedAt - a.watchedAt || b.createdAt - a.createdAt);
+    if (evs.length) {
+      const all = UI.histAll[id], shown = all ? evs : evs.slice(0, 6);
+      h += `<div class="card panel"><div class="section-head"><h3 style="flex:1">Watch history</h3><span class="small muted num">${evs.length} watch${evs.length > 1 ? "es" : ""}</span></div>
+        ${historyRows(shown, w)}${evs.length > 6 ? `<div><button class="link-btn" data-act="hist-all" data-id="${esc(id)}">${all ? "Show fewer" : `Show all ${evs.length}`}</button></div>` : ""}</div>`;
+    }
   } else {
     const mw = movieWatches(id);
     h += `<div class="card panel"><div class="section-head"><h3 style="flex:1">Watch history</h3><button class="btn primary" data-act="movie-watch" data-id="${esc(id)}">${I.check.replace("<svg", '<svg width="18" height="18"')} Mark watched</button></div>
-      ${mw.length ? mw.map((e) => `<div class="toggle-row"><div style="flex:1"><b>${esc(fmtDate(dayOfMillis(e.watchedAt)))}</b>${e.isRewatch ? ' <span class="pill">Rewatch</span>' : ""}</div>
-        <button class="icon-btn" data-act="event-del" data-ev="${esc(e.id)}" aria-label="Remove the watch on ${esc(fmtDate(dayOfMillis(e.watchedAt)))}">${I.x}</button></div>`).join("") : `<p class="muted" style="margin:0">Not watched yet.</p>`}
+      ${mw.length ? historyRows(mw, w) : `<p class="muted" style="margin:0">Not watched yet.</p>`}
     </div>`;
   }
   if (w.overview) h += `<div class="card panel"><h3>Overview</h3><p style="margin:0;max-width:65ch">${esc(w.overview)}</p></div>`;
   h += watchSection(w);
   h += detailsCard(w);
-  if ((w.cast || []).length) h += `<div class="card panel"><h3>Cast</h3><p style="margin:0" class="small">${esc(w.cast.join(", "))}</p></div>`;
+  h += castSection(w);
   if ((w.altTitles || []).length) h += `<details class="card panel"><summary>Also known as</summary><p class="small" style="margin:0">${esc(w.altTitles.join(" · "))}</p></details>`;
   h += `<p class="tiny muted" style="margin:0">${w.isManual ? (w.demo ? "Demo title with made-up details, for trying the app. Delete it any time." : "Manual entry: details added by you, not from a catalog.") : `Data from TMDB${w.fetchedAt ? ", updated " + esc(fmtDate(dayOfMillis(w.fetchedAt))) : ""}. This product uses the TMDB API but is not endorsed or certified by TMDB.`}</p>`;
   h += `</div><div style="display:grid;gap:20px">${libraryPanel(w, st)}</div></div>`;
@@ -1779,6 +1961,195 @@ function watchSection(w) {
   return `<div class="card panel" aria-live="polite">${head}${body}${foot(meta)}</div>`;
 }
 
+
+// ======================================================================
+//  Watch dialog: themed date picker + "where did you watch it"
+// ======================================================================
+const monthName = (i, style = "long") => new Date(2000, i, 1).toLocaleDateString(undefined, { month: style });
+const EN_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+/** Typed dates: 2026-11-20, 20/11/2026 (day first), 20 Nov 2026, Nov 20, 2026. Returns an ISO day or null. */
+function parseDateInput(str) {
+  const t = String(str || "").trim().replace(/\s+/g, " ");
+  if (!t) return null;
+  const monthIdx = (w) => {
+    const k = w.toLowerCase().replace(/\./g, "").slice(0, 3);
+    let i = EN_MONTHS.indexOf(k);
+    if (i < 0) for (let j = 0; j < 12; j++) if (monthName(j, "short").toLowerCase().replace(/\./g, "").slice(0, 3) === k) i = j;
+    return i;
+  };
+  let y, mo, d, r;
+  if ((r = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) [y, mo, d] = [+r[1], +r[2], +r[3]];
+  else if ((r = t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/))) {
+    [d, mo, y] = [+r[1], +r[2], +r[3]];
+    if (r[3].length === 2) y += y <= new Date().getFullYear() % 100 ? 2000 : 1900;
+  } else if ((r = t.match(/^(\d{1,2}) ([A-Za-zÀ-ɏ.]+),? (\d{4})$/))) [d, mo, y] = [+r[1], monthIdx(r[2]) + 1, +r[3]];
+  else if ((r = t.match(/^([A-Za-zÀ-ɏ.]+) (\d{1,2}),? (\d{4})$/))) [mo, d, y] = [monthIdx(r[1]) + 1, +r[2], +r[3]];
+  else return null;
+  if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y >= 1900)) return null;
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return isoOf(dt);
+}
+const ymOf = (iso) => iso.slice(0, 7);
+const shiftMonth = (ym, n) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+const longDate = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }); };
+
+function calendarHtml(m) {
+  const c = m.cal, t = today(), [vy, vm] = c.view.split("-").map(Number);
+  const thisYM = ymOf(t), atMax = c.view >= thisYM;
+  const head = `<div class="cal-head">
+      <button class="icon-btn" data-act="cal-nav" data-n="-1" aria-label="Previous month">${I.left}</button>
+      <button class="cal-title" id="cal-title" data-act="cal-pickmode" aria-expanded="${!!c.pick}" aria-label="${esc(monthName(vm - 1) + " " + vy)}, choose month and year">${esc(monthName(vm - 1))} ${vy} ${I.chev}</button>
+      <button class="icon-btn" data-act="cal-nav" data-n="1" aria-label="Next month" ${atMax ? "disabled" : ""}>${I.right}</button></div>`;
+  let body;
+  if (c.pick) {
+    const years = []; for (let y = new Date().getFullYear(); y >= 1900; y--) years.push(y);
+    body = `<div class="cal-years"><button class="icon-btn" data-act="cal-year" data-n="-1" aria-label="Previous year">${I.left}</button>
+        <label class="sr" for="cal-year-sel">Year</label><select id="cal-year-sel" class="input" data-act-change="cal-year-sel" style="min-height:42px;text-align:center">${years.map((y) => `<option value="${y}" ${y === vy ? "selected" : ""}>${y}</option>`).join("")}</select>
+        <button class="icon-btn" data-act="cal-year" data-n="1" aria-label="Next year" ${vy >= new Date().getFullYear() ? "disabled" : ""}>${I.right}</button></div>
+      <div class="cal-months" role="group" aria-label="Month">${Array.from({ length: 12 }, (_, i) => {
+        const ym = `${vy}-${pad(i + 1)}`;
+        return `<button data-act="cal-month" data-ym="${ym}" aria-pressed="${i + 1 === vm}" ${ym > thisYM ? "disabled" : ""}>${esc(monthName(i, "short"))}</button>`; }).join("")}</div>`;
+  } else {
+    const first = new Date(vy, vm - 1, 1), start = new Date(vy, vm - 1, 1 - first.getDay());
+    const focusIso = c.focus && ymOf(c.focus) === c.view ? c.focus : m.date && ymOf(m.date) === c.view ? m.date : t <= `${c.view}-31` && ymOf(t) === c.view ? t : `${c.view}-01`;
+    let rows = "";
+    for (let w = 0; w < 6; w++) {
+      rows += "<tr>";
+      for (let k = 0; k < 7; k++) {
+        const dt = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7 + k), iso = isoOf(dt);
+        const out = dt.getMonth() !== vm - 1, fut = iso > t, sel = iso === m.date, isT = iso === t;
+        rows += `<td><button type="button" class="cal-day-btn ${out ? "out" : ""} ${isT ? "today" : ""}" id="cal-d-${iso}" data-act="cal-pick" data-d="${iso}"
+          aria-pressed="${sel}" ${isT ? 'aria-current="date"' : ""} ${fut ? "disabled" : ""} tabindex="${iso === focusIso ? 0 : -1}"
+          aria-label="${esc(longDate(iso))}${isT ? ", today" : ""}${fut ? ", in the future" : ""}">${dt.getDate()}</button></td>`;
+      }
+      rows += "</tr>";
+      if (w >= 4 && new Date(start.getFullYear(), start.getMonth(), start.getDate() + (w + 1) * 7).getMonth() !== vm - 1) break;
+    }
+    const wk = Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i)); // a Sunday-first week
+    body = `<table class="cal-grid" role="grid" aria-labelledby="cal-title"><thead><tr>${wk.map((d) => `<th scope="col" abbr="${esc(d.toLocaleDateString(undefined, { weekday: "long" }))}">${esc(d.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 3))}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  return `<div class="cal" id="wd-cal" role="dialog" aria-label="Choose the date you watched it">${head}${body}
+    <div class="cal-foot"><button class="btn" data-act="cal-pick" data-d="${t}">Today</button><span class="tiny muted" aria-live="polite">${m.date ? "Selected: " + esc(fmtDate(m.date)) : ""}</span><button class="btn ghost" data-act="cal-close">Done</button></div></div>`;
+}
+
+const SRC_LABEL = { theater: "Theater", other: "Other platform", unofficial: "Unofficial" };
+const srcLabel = (src) => (src.kind === "ott" || src.kind === "other" ? src.name : SRC_LABEL[src.kind]);
+function srcIcon(src, logo) {
+  const ico = src.kind === "theater" ? I.ticket : src.kind === "unofficial" ? I.skull : I.screen;
+  // An official provider logo only when TMDB supplies one; otherwise the neutral screen icon. Never a guessed logo.
+  const img = logo ? imgTag(Catalog.imgs(logo, "w92"), "") : "";
+  return `<span class="src-ico" aria-hidden="true">${ico}${img}</span>`;
+}
+const sourceTag = (src) => (src ? `<span class="src-tag" title="Watched via ${esc(srcLabel(src))}">${srcIcon(src, src.kind === "ott" ? src.logo : null)}<span><span class="sr">Watched via </span>${esc(srcLabel(src))}</span></span>` : "");
+/** Providers listed for the title right now in the viewing country (title-level JustWatch data via TMDB). */
+function currentProviders(w) {
+  const cur = w && w.watch && w.watch.region === region() ? w.watch : null;
+  if (!cur || !cur.data) return { cur, list: [] };
+  const seen = new Set(), list = [];
+  for (const p of [...cur.data.stream, ...cur.data.free, ...cur.data.rent, ...cur.data.buy]) if (!seen.has(p.id)) { seen.add(p.id); list.push(p); }
+  return { cur, list: list.slice(0, 12) };
+}
+function sourcePicker(m) {
+  const w = S.works[m.id], src = m.source, reg = countryName(region());
+  const radio = (key, s, extraCls = "") => {
+    const on = !!src && src.kind === s.kind && (s.kind !== "ott" || String(src.id ?? src.name) === String(s.id ?? s.name));
+    return `<button type="button" class="src ${extraCls}" role="radio" aria-checked="${on}" data-act="src-pick" data-k="${key}">${srcIcon(s, s.kind === "ott" ? s.logo : null)}<span>${esc(srcLabel(s))}</span></button>`;
+  };
+  const { cur, list } = currentProviders(w);
+  const provs = list.map((p) => ({ kind: "ott", id: p.id, name: p.name, logo: p.logo }));
+  if (src && src.kind === "ott" && !provs.some((p) => String(p.id ?? p.name) === String(src.id ?? src.name))) provs.push({ ...src, earlier: true });
+  m.provs = provs;
+  const st = UI.watch[m.id] || {};
+  let note;
+  if (!w || w.isManual) note = "The current platform list isn't available for titles you added yourself. Use Other platform for a streaming service.";
+  else if (IN_SANDBOX || Catalog.status() !== "ready") note = "The current platform list isn't available here. Use Other platform for a streaming service.";
+  else if (!cur && st.loading) note = "Checking which platforms list this title now…";
+  else if (!cur && st.error) note = "Couldn't load the current platform list right now. Use Other platform for a streaming service.";
+  else if (!cur) note = "Checking which platforms list this title now…";
+  else if (!list.length) note = `JustWatch's data lists no platforms in ${esc(reg)} for this title at the moment. Use Other platform for where you watched it.`;
+  else note = `Listed in ${esc(reg)} now, from JustWatch's data via TMDB. Where you watched it may differ; use Other platform if it isn't here.`;
+  return `<fieldset class="src-group" style="border:0;padding:0;margin:0;min-width:0">
+    <legend style="padding:0;margin-bottom:8px;font-weight:600;font-size:14px">Where did you watch it? <span class="muted" style="font-weight:500">Optional</span></legend>
+    <div role="radiogroup" aria-label="Where you watched it" style="display:grid;gap:12px">
+      <div class="src-list">${radio("theater", { kind: "theater" })}</div>
+      <div style="display:grid;gap:8px"><span class="src-sub">OTT platforms</span>
+        ${provs.length ? `<div class="src-list">${provs.map((p, i) => radio("ott:" + i, p)).join("")}</div>` : ""}
+        <span class="tiny muted" role="status">${note}</span></div>
+      <div class="src-list">${radio("other", { kind: "other", name: SRC_LABEL.other })}${radio("unofficial", { kind: "unofficial" }, "unofficial")}</div>
+    </div>
+    ${src && src.kind === "other" ? `<div class="field"><label for="src-other">Platform name</label><input id="src-other" class="input" value="${esc(m.otherText || "")}" data-input="src-other" maxlength="80" autocomplete="off" placeholder="e.g. Zee5, SonyLIV, a friend's Netflix"></div>` : ""}
+    ${src ? `<div><button class="link-btn" data-act="src-clear">Clear choice</button></div>` : ""}
+  </fieldset>`;
+}
+function watchSheet(m) {
+  const w = S.works[m.id], ep = m.ep ? (S.episodes[m.id] || []).find((e) => e.id === m.ep) : null;
+  const title = m.evId ? "Edit watch" : m.ep && m.rewatch && m.wasWatched ? "Log a rewatch" : "Mark watched";
+  const open = m.cal.open;
+  return `<h2 id="m-title">${title}</h2>
+    <p class="small muted" style="margin:-8px 0 0">${esc(w.title)}${ep ? " · " + esc(epCode(ep)) + (ep.title ? " · " + esc(ep.title) : "") : ""}</p>
+    <div class="field"><label for="wd-input">Date watched</label>
+      <div class="datefield"><input id="wd-input" class="input ${m.dateErr ? "err" : ""}" value="${esc(m.dateText != null ? m.dateText : m.date ? fmtDate(m.date) : "")}" data-input="wd-text" data-act="cal-open"
+          autocomplete="off" spellcheck="false" aria-describedby="wd-hint" ${m.dateErr ? 'aria-invalid="true"' : ""}>
+        <button id="wd-toggle" class="icon-btn" data-act="cal-toggle" aria-expanded="${open}" aria-controls="wd-cal" aria-label="${open ? "Close calendar" : "Choose the date from a calendar"}">${I.calendar}</button></div>
+      <span id="wd-hint" class="${m.dateErr ? "err-text" : "tiny muted"}">${m.dateErr ? esc(m.dateErr) : "Type a date like 20/11/2026 or 20 Nov 2026, or pick one."}</span></div>
+    ${open ? calendarHtml(m) : ""}
+    <label class="toggle-row" style="cursor:pointer"><input type="checkbox" id="wd-re" ${m.rewatch ? "checked" : ""} data-input="wd-re" style="width:22px;height:22px;accent-color:var(--accent)"> <span>This was a rewatch</span></label>
+    ${sourcePicker(m)}
+    <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="watch-save">Save</button></div>`;
+}
+function openWatch(opts) {
+  const m = { type: "watch", source: null, otherText: "", dateText: null, dateErr: null, ...opts };
+  if (m.source && m.source.kind === "other") m.otherText = m.source.name;
+  m.cal = { open: false, view: ymOf(m.date || today()), pick: false, focus: null };
+  openModal(m);
+  loadWatch(m.id, false);
+}
+/** Commit what's typed in the date box (if anything). Returns false and shows a message when it can't be read. */
+function commitTypedDate(m) {
+  if (m.dateText == null) return true;
+  const iso = parseDateInput(m.dateText);
+  if (!iso) { m.dateErr = "That date couldn't be read. Try 20/11/2026 or 20 Nov 2026."; return false; }
+  if (iso > today()) { m.dateErr = "That date is in the future."; return false; }
+  m.date = iso; m.dateText = null; m.dateErr = null; m.cal.view = ymOf(iso);
+  return true;
+}
+function calFocus(iso) { setTimeout(() => { const el = document.getElementById("cal-d-" + iso); if (el) el.focus(); }, 0); }
+function calMove(m, iso) {
+  const t = today(); if (iso > t) iso = t;
+  m.cal.focus = iso; m.cal.view = ymOf(iso); render(); calFocus(iso);
+}
+
+/** Watch records, newest first, with date, rewatch flag, source and edit/remove controls. */
+function historyRows(evs, w) {
+  const eps = Object.fromEntries((S.episodes[w.id] || []).map((e) => [e.id, e]));
+  return `<div class="hist">${evs.map((e) => {
+    const ep = e.episodeId ? eps[e.episodeId] : null, day = fmtDate(evDate(e));
+    const what = ep ? `${epCode(ep)}${ep.title ? " · " + ep.title : ""}` : e.episodeId ? "Episode" : "";
+    return `<div class="hist-row"><div style="min-width:0">
+        ${what ? `<div style="font-weight:600;overflow-wrap:anywhere">${esc(what)}</div>` : ""}
+        <div class="${what ? "small muted" : ""}" style="${what ? "" : "font-weight:700"}">${esc(day)}</div>
+        ${e.isRewatch || e.source ? `<div class="meta-line">${e.isRewatch ? '<span class="pill">Rewatch</span>' : ""}${sourceTag(e.source)}</div>` : ""}</div>
+      <div style="display:flex;gap:2px"><button class="icon-btn" data-act="watch-edit" data-ev="${esc(e.id)}" aria-label="Edit the watch on ${esc(day)}${what ? " of " + esc(what) : ""}">${I.pencil}</button>
+        <button class="icon-btn" data-act="event-del" data-ev="${esc(e.id)}" aria-label="Remove the watch on ${esc(day)}${what ? " of " + esc(what) : ""}">${I.x}</button></div></div>`;
+  }).join("")}</div>`;
+}
+function castSection(w) {
+  const list = (w.cast || []).map((c) => (typeof c === "string" ? { name: c, character: null, profile: null } : c)).filter((c) => c && c.name);
+  if (!list.length) return "";
+  const rowId = "cast-" + hashHue(w.id);
+  const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join("");
+  const cards = list.map((c) => {
+    // A photo is only ever this person's own catalog profile image; if it's missing or fails, their initials show instead.
+    const img = c.profile ? imgTag(Catalog.imgs(c.profile, "w185"), "").replace('alt=""', `alt="${esc(c.name)}"`) : "";
+    return `<div class="cast" role="listitem"><div class="cast-photo"><div class="ini" aria-hidden="true">${esc(initials(c.name)) || I.person}</div>${img}</div>
+      <div><div class="cast-name">${esc(c.name)}</div>${c.character ? `<div class="cast-role"><span class="sr">as </span>${esc(c.character)}</div>` : ""}</div></div>`;
+  }).join("");
+  return `<div class="card panel" style="min-width:0"><div class="section-head"><h3 style="flex:1" id="${rowId}-h">Cast</h3>
+    ${list.length > 3 ? `<div class="scroll-btns"><button class="icon-btn" data-act="cast-scroll" data-row="${rowId}" data-dir="-1" aria-label="Scroll cast left">${I.left}</button><button class="icon-btn" data-act="cast-scroll" data-row="${rowId}" data-dir="1" aria-label="Scroll cast right">${I.right}</button></div>` : ""}</div>
+    <div class="cast-row" id="${rowId}" role="list" tabindex="0" aria-labelledby="${rowId}-h">${cards}</div>
+    ${legacyCast(w) && Catalog.status() === "ready" ? `<p class="tiny muted" style="margin:0">Loading photos…</p>` : list.some((c) => c.profile) ? `<p class="tiny muted" style="margin:0">Photos from TMDB.</p>` : ""}</div>`;
+}
 function detailsCard(w) {
   const x = w.extra || {};
   const rows = [];
@@ -1826,11 +2197,15 @@ function epRow(w, e, isW, t) {
       <div class="meta-line" style="margin-top:4px">
         ${a === "aired" ? `<span class="small muted">${esc(fmtDate(e.airDate))}</span>` : a === "upcoming" ? `<span class="pill accent">Airs ${esc(relDay(e.airDate))}</span>` : `<span class="pill">Date unknown</span>`}
         ${e.runtimeMinutes ? `<span class="small muted">${e.runtimeMinutes} min</span>` : ""}${e.isManual && !w.isManual ? '<span class="pill">Manual</span>' : ""}
+        ${isW ? (() => { const last = activeEvents(w.id).filter((x) => x.episodeId === e.id).sort((a, b) => b.watchedAt - a.watchedAt)[0]; return last && last.source ? sourceTag(last.source) : ""; })() : ""}
       </div>
       ${e.overview ? (hide ? `<button class="spoiler" data-act="reveal" data-ep="${esc(e.id)}">Synopsis hidden · Show</button>` : `<p class="small" style="margin:6px 0 0;max-width:65ch">${esc(e.overview)}</p>`) : ""}
     </div>
     <div class="menu"><button class="icon-btn" data-act="menu" data-id="${esc(menuId)}" aria-haspopup="true" aria-expanded="${UI.menu === menuId}" aria-label="Options for ${esc(epCode(e))}">${I.more}</button>
       ${UI.menu === menuId ? `<div class="menu-pop" role="menu">
+        ${isW ? `<button role="menuitem" data-act="watch-ep-edit" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Edit watch date &amp; source…</button>
+          <button role="menuitem" data-act="watch-ep-new" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Log a rewatch…</button>`
+          : a !== "upcoming" ? `<button role="menuitem" data-act="watch-ep-new" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Mark watched with date &amp; source…</button>` : ""}
         <button role="menuitem" data-act="through" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Mark watched up to here…</button>
         ${e.isManual ? `<button role="menuitem" data-act="ep-edit" data-id="${esc(w.id)}" data-ep="${esc(e.id)}">Edit title and date</button>` : ""}
       </div>` : ""}</div>
@@ -1864,7 +2239,7 @@ function openModal(m) { UI.modal = m; UI.menu = null; render(); setTimeout(() =>
 function closeModal() { UI.modal = null; render(); }
 function renderModal() {
   const m = UI.modal, root = document.getElementById("overlay");
-  if (!m) { root.innerHTML = ""; return; }
+  if (!m) { root.innerHTML = ""; renderModal.last = null; return; }
   let body = "";
   if (m.type === "confirm") {
     body = `<h2 id="m-title">${esc(m.title)}</h2><div style="display:grid;gap:8px">${m.body}</div>
@@ -1872,10 +2247,7 @@ function renderModal() {
   } else if (m.type === "manual") body = manualForm(m);
   else if (m.type === "lib-filters") body = libFilters();
   else if (m.type === "disc-filters") body = discFilters(m);
-  else if (m.type === "movie-watch") body = `<h2 id="m-title">Mark watched</h2>
-      <div class="field"><label for="mw-date">Date watched</label><input id="mw-date" class="input" type="date" max="${today()}" value="${esc(m.date)}" data-input="mw-date"></div>
-      <label class="toggle-row" style="cursor:pointer"><input type="checkbox" id="mw-re" ${m.rewatch ? "checked" : ""} data-input="mw-re" style="width:22px;height:22px;accent-color:var(--accent)"> <span>This was a rewatch</span></label>
-      <div class="actions"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="movie-watch-save">Save</button></div>`;
+  else if (m.type === "watch") body = watchSheet(m);
   else if (m.type === "add-eps") body = `<h2 id="m-title">Add episodes</h2>
       <div class="field"><label for="ae-s">Season (0 for specials)</label><input id="ae-s" class="input" inputmode="numeric" value="${esc(m.season)}" data-input="ae-s"></div>
       <div class="field"><label for="ae-c">How many episodes</label><input id="ae-c" class="input" inputmode="numeric" value="${esc(m.count)}" data-input="ae-c"></div>
@@ -1897,7 +2269,11 @@ function renderModal() {
       <p class="small muted" style="margin:0">Choose “Not now” to stay local-only. Nothing changes on this device or in the cloud.</p>
       <div class="actions"><button class="btn ghost" data-act="sync-merge-cancel">Not now</button><button class="btn primary" data-act="sync-merge-ok">${m.remote ? "Merge both" : "Upload this library"}</button></div>`;
   else if (m.type === "info") body = `<h2 id="m-title">${esc(m.title)}</h2><div style="display:grid;gap:10px">${m.body}</div><div class="actions"><button class="btn primary" data-act="modal-close">OK</button></div>`;
-  root.innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet fade-in" role="dialog" aria-modal="true" aria-labelledby="m-title">${body}</div></div>`;
+  // Same dialog re-rendering (a click inside it): no fade replay, and keep its scroll position.
+  const prev = root.querySelector(".sheet"), same = renderModal.last === m && prev, top = same ? prev.scrollTop : 0;
+  renderModal.last = m;
+  root.innerHTML = `<div class="scrim" data-act="scrim"><div class="sheet ${same ? "" : "fade-in"}" role="dialog" aria-modal="true" aria-labelledby="m-title">${body}</div></div>`;
+  if (same) root.querySelector(".sheet").scrollTop = top;
 }
 function confirmDlg(title, body, ok, onOk, danger) { openModal({ type: "confirm", title, body, ok, onOk, danger }); }
 
@@ -1966,7 +2342,7 @@ function exportJson() {
     seasons: Object.values(S.seasons).flat().map((s) => pick(s, ["workId", "number", "name", "episodeCount", "airDate"])),
     episodes: Object.values(S.episodes).flat().map((e) => ({ ...pick(e, ["id", "workId", "season", "number", "title", "airDate", "runtimeMinutes", "overview", "providerId", "updatedAt"]), isManual: !!e.isManual })),
     states: Object.values(S.states).map((s) => pick(s, ["workId", "interest", "interestAt", "status", "statusAt", "watchlist", "watchlistAt", "rating", "ratingAt", "notes", "notesAt", "deviceId"])),
-    events: Object.values(S.events).map((e) => pick(e, ["id", "workId", "episodeId", "watchedAt", "isRewatch", "createdAt", "deletedAt", "deviceId"])),
+    events: Object.values(S.events).map((e) => pick(e, ["id", "workId", "episodeId", "watchedAt", "watchedDate", "isRewatch", "source", "createdAt", "deletedAt", "deviceId"])),
     tombstones: Object.values(S.tombs),
     settings: { theme: S.settings.theme.toUpperCase(), catalogLanguage: S.settings.lang, includeSpecials: String(S.settings.includeSpecials), hideSpoilers: String(S.settings.hideSpoilers) },
   }, null, 2);
@@ -1992,7 +2368,8 @@ function parseBackup(text) {
     if (s.rating != null && !(s.rating >= 1 && s.rating <= 10)) errors.push("A rating is outside 1–10.");
   });
   arr("episodes").forEach((e) => { if (!ids.has(e.workId)) errors.push(`Episode ${e.id} belongs to a missing title.`); });
-  arr("events").forEach((e) => { if (!ids.has(e.workId)) errors.push(`Watch record ${e.id} belongs to a missing title.`); if (typeof e.watchedAt !== "number") errors.push(`Watch record ${e.id} has no date.`); });
+  arr("events").forEach((e) => { if (!ids.has(e.workId)) errors.push(`Watch record ${e.id} belongs to a missing title.`); if (typeof e.watchedAt !== "number") errors.push(`Watch record ${e.id} has no date.`);
+    if (e.watchedDate != null && !validISO(e.watchedDate)) errors.push(`Watch record ${e.id} has an invalid date.`); e.source = cleanSource(e.source); });
   if (errors.length) return { errors: errors.slice(0, 12) };
   return { bundle: { works: arr("works"), seasons: arr("seasons"), episodes: arr("episodes"), states: arr("states"), events: arr("events"), tombstones: arr("tombstones"), settings: o.settings || {} } };
 }
@@ -2112,7 +2489,7 @@ async function openDetail(id) {
   UI.detail = id; UI.menu = null; render(); window.scrollTo(0, 0);
   const w = S.works[id];
   loadWatch(id, false);
-  if (w && !w.isManual && !w.extra && w.providerId && Catalog.status() === "ready") {
+  if (w && !w.isManual && (!w.extra || legacyCast(w)) && w.providerId && Catalog.status() === "ready") {
     try { await openCatalogItem({ key: id, type: w.type, providerId: w.providerId }); if (UI.detail === id) render(); } catch {}
   }
   if (w && !w.isManual && w.type === "SERIES" && Catalog.status() === "ready") {
@@ -2202,12 +2579,43 @@ const act = {
   "set-rating": (d) => { const v = +d.v || null; const u = setField(d.id, "rating", v); render(); toast(v ? `Rated ${v}/10` : "Rating cleared", () => { u(); render(); }); },
   "lib-add": (d) => { ensureState(d.id); Persist.touch(d.id); render(); toast("Added to library"); },
   "lib-add-watchlist": (d) => { const u = setField(d.id, "watchlist", true); render(); toast("Added to watchlist", () => { u(); render(); }); },
-  "movie-watch": (d) => openModal({ type: "movie-watch", id: d.id, date: today(), rewatch: movieWatches(d.id).length > 0 }),
-  "movie-watch-save": () => {
+  "movie-watch": (d) => openWatch({ id: d.id, ep: null, date: today(), rewatch: movieWatches(d.id).length > 0 }),
+  "watch-ep-new": (d) => { const was = watchedSet(d.id).has(d.ep); UI.menu = null; openWatch({ id: d.id, ep: d.ep, date: today(), rewatch: was, wasWatched: was }); },
+  "watch-ep-edit": (d) => { const e = activeEvents(d.id).filter((x) => x.episodeId === d.ep).sort((a, b) => b.watchedAt - a.watchedAt)[0]; UI.menu = null; if (e) act["watch-edit"]({ ev: e.id }); },
+  "watch-edit": (d) => { const e = S.events[d.ev]; if (!e) return; openWatch({ id: e.workId, ep: e.episodeId, evId: e.id, date: evDate(e), rewatch: !!e.isRewatch, source: e.source || null }); },
+  "watch-save": () => {
     const m = UI.modal;
-    if (!validISO(m.date) || m.date > today()) { toast("Pick a date that isn't in the future."); return; }
-    const u = addMovieWatch(m.id, m.date, m.rewatch); closeModal(); toast("Marked watched", () => { u(); render(); });
+    if (!commitTypedDate(m)) { render(); document.getElementById("wd-input")?.focus(); return; }
+    if (!m.date || !validISO(m.date) || m.date > today()) { m.dateErr = "Pick a date that isn't in the future."; render(); return; }
+    let src = m.source;
+    if (src && src.kind === "other") {
+      if (!(m.otherText || "").trim()) { toast("Type the platform's name, or choose another option."); document.getElementById("src-other")?.focus(); return; }
+      src = { kind: "other", name: m.otherText.trim() };
+    }
+    const u = m.evId ? editWatch(m.evId, m.date, m.rewatch, src) : addWatch(m.id, m.ep, m.date, m.rewatch, src);
+    closeModal(); toast(m.evId ? "Watch updated" : m.rewatch ? "Rewatch logged" : "Marked watched", () => { u(); render(); });
   },
+  "hist-all": (d) => { UI.histAll[d.id] = !UI.histAll[d.id]; render(); },
+  "cal-open": () => { const m = UI.modal; if (m && m.cal && !m.cal.open) { m.cal.open = true; m.cal.pick = false; if (m.date) m.cal.view = ymOf(m.date); render(); } },
+  "cal-toggle": () => { const m = UI.modal; commitTypedDate(m); m.cal.open = !m.cal.open; m.cal.pick = false; m.cal.focus = null; if (m.date) m.cal.view = ymOf(m.date); render();
+    if (m.cal.open) calFocus(m.cal.view === ymOf(today()) && !m.date ? today() : m.date || today()); },
+  "cal-close": () => { UI.modal.cal.open = false; render(); document.getElementById("wd-toggle")?.focus(); },
+  "cal-nav": (d) => { const c = UI.modal.cal; c.view = shiftMonth(c.view, +d.n); if (c.view > ymOf(today())) c.view = ymOf(today()); c.focus = null; render(); },
+  "cal-pickmode": () => { const c = UI.modal.cal; c.pick = !c.pick; render(); },
+  "cal-year": (d) => { const c = UI.modal.cal; const [y, mo] = c.view.split("-").map(Number); let v = `${y + +d.n}-${pad(mo)}`; if (v > ymOf(today())) v = ymOf(today()); c.view = v; render(); },
+  "cal-year-sel": (d, el) => { const c = UI.modal.cal; const mo = c.view.slice(5); let v = `${el.value}-${mo}`; if (v > ymOf(today())) v = ymOf(today()); c.view = v; render(); document.getElementById("cal-year-sel")?.focus(); },
+  "cal-month": (d) => { const c = UI.modal.cal; c.view = d.ym; c.pick = false; c.focus = null; render(); const m = UI.modal; calFocus(m.date && ymOf(m.date) === d.ym ? m.date : `${d.ym}-01` > today() ? today() : `${d.ym}-01`); },
+  "cal-pick": (d) => { const m = UI.modal; if (d.d > today()) return; m.date = d.d; m.dateText = null; m.dateErr = null; m.cal.open = false; m.cal.view = ymOf(d.d); render(); document.getElementById("wd-toggle")?.focus(); },
+  "src-pick": (d) => {
+    const m = UI.modal; let next;
+    if (d.k === "theater" || d.k === "unofficial") next = { kind: d.k };
+    else if (d.k === "other") next = { kind: "other", name: m.otherText || "" };
+    else { const p = m.provs[+d.k.split(":")[1]]; next = { kind: "ott", id: p.id ?? null, name: p.name, logo: p.logo || null }; }
+    const same = m.source && m.source.kind === next.kind && (next.kind !== "ott" || String(m.source.id ?? m.source.name) === String(next.id ?? next.name));
+    m.source = same ? null : next; render();
+    if (!same && next.kind === "other") setTimeout(() => document.getElementById("src-other")?.focus(), 0);
+  },
+  "src-clear": () => { UI.modal.source = null; render(); },
   "event-del": (d) => { const u = deleteEvent(d.ev); render(); toast("Watch removed", () => { u(); render(); }); },
   "add-eps": (d) => openModal({ type: "add-eps", id: d.id, season: "1", count: "10" }),
   "add-eps-save": () => {
@@ -2229,6 +2637,7 @@ const act = {
   "toggle-anime": (d) => { const w = S.works[d.id]; w.isAnime = !w.isAnime; w.updatedAt = now(); Persist.touch(d.id); UI.menu = null; render(); },
   refresh: async (d) => { UI.menu = null; const w = S.works[d.id]; w.fetchedAt = 0; render(); try { await openCatalogItem({ key: d.id, type: w.type, providerId: w.providerId }); const e = await ensureEpisodes(d.id, true); toast(e ? Catalog.message(e.code) : "Updated from TMDB"); } catch (e) { toast(Catalog.message(e.code)); } render(); },
   "watch-refresh": (d) => loadWatch(d.id, true),
+  "cast-scroll": (d) => { const row = document.getElementById(d.row); if (row) row.scrollBy({ left: +d.dir * row.clientWidth * 0.8, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); },
   "link-open": (d) => { openModal({ type: "link", id: d.id, q: S.works[d.id].title, items: null }); linkSearch(); },
   "link-pick": (d) => linkPreview(d.key),
   "link-back": () => { UI.modal.preview = null; render(); },
@@ -2295,7 +2704,11 @@ const act = {
     try { const id = await openCatalogItem(it); UI.disc.opening = null; openDetail(id); } catch (e) { UI.disc.opening = null; render(); toast(Catalog.message(e.code)); }
   },
   "disc-watchlist": async (d) => {
-    const it = UI.disc.items.find((i) => i.key === d.key); UI.disc.opening = d.key; render();
+    const it = UI.disc.items.find((i) => i.key === d.key);
+    if (S.states[d.key] && S.states[d.key].watchlist) {
+      const u = setField(d.key, "watchlist", false); render(); toast(`${it.title} removed from watchlist`, () => { u(); render(); }); return;
+    }
+    UI.disc.opening = d.key; render();
     try { const id = await openCatalogItem(it); const u = setField(id, "watchlist", true); UI.disc.opening = null; render(); toast(`${it.title} added to watchlist`, () => { u(); render(); }); }
     catch (e) { UI.disc.opening = null; render(); toast(Catalog.message(e.code)); }
   },
@@ -2366,6 +2779,21 @@ document.addEventListener("click", (ev) => {
   if (fn) { if (el.dataset.act !== "scrim") ev.preventDefault(); fn(el.dataset, el, ev); }
 });
 document.addEventListener("keydown", (ev) => {
+  const m = UI.modal;
+  if (m && m.type === "watch") {
+    if (ev.key === "Escape" && m.cal.open) { ev.preventDefault(); m.cal.open = false; render(); document.getElementById("wd-toggle")?.focus(); return; }
+    if (ev.key === "Enter" && ev.target.id === "wd-input") { ev.preventDefault(); commitTypedDate(m); render(); return; }
+    if (ev.target.classList && ev.target.classList.contains("cal-day-btn")) {
+      const iso = ev.target.dataset.d, [y, mo, d] = iso.split("-").map(Number), dt = new Date(y, mo - 1, d);
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[ev.key];
+      let next = null;
+      if (step) next = isoOf(new Date(y, mo - 1, d + step));
+      else if (ev.key === "Home") next = isoOf(new Date(y, mo - 1, d - dt.getDay()));
+      else if (ev.key === "End") next = isoOf(new Date(y, mo - 1, d + 6 - dt.getDay()));
+      else if (ev.key === "PageUp" || ev.key === "PageDown") { const n = (ev.key === "PageUp" ? -1 : 1) * (ev.shiftKey ? 12 : 1); const t2 = new Date(y, mo - 1 + n, 1); next = isoOf(new Date(t2.getFullYear(), t2.getMonth(), Math.min(d, new Date(t2.getFullYear(), t2.getMonth() + 1, 0).getDate()))); }
+      if (next) { ev.preventDefault(); calMove(m, next); return; }
+    }
+  }
   if (ev.key === "Escape") { if (UI.modal) closeModal(); else if (UI.menu) { UI.menu = null; render(); } else if (UI.detail) act.back(); }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches('[role="button"][data-act]')) { ev.preventDefault(); ev.target.click(); }
 });
@@ -2379,8 +2807,9 @@ document.addEventListener("input", (ev) => {
   else if (k === "mf") m.f[el.dataset.k] = el.value;
   else if (k === "link-q") { m.q = el.value; clearTimeout(linkTimer); linkTimer = setTimeout(linkSearch, 400); }
   else if (k === "mf-anime") m.f.isAnime = el.checked;
-  else if (k === "mw-date") m.date = el.value;
-  else if (k === "mw-re") m.rewatch = el.checked;
+  else if (k === "wd-text") { m.dateText = el.value; }
+  else if (k === "wd-re") m.rewatch = el.checked;
+  else if (k === "src-other") { m.otherText = el.value; if (m.source && m.source.kind === "other") m.source.name = el.value; }
   else if (k === "ae-s") m.season = el.value;
   else if (k === "ae-c") m.count = el.value;
   else if (k === "ee-t") m.title = el.value;
@@ -2393,6 +2822,13 @@ document.addEventListener("input", (ev) => {
 });
 document.addEventListener("change", (ev) => {
   const el = ev.target;
+  if (el.dataset.input === "wd-text" && UI.modal && UI.modal.type === "watch") {
+    // Update the field in place: a full re-render here could swallow the click that caused the blur.
+    const m = UI.modal, ok = commitTypedDate(m), hint = document.getElementById("wd-hint");
+    if (ok) { el.value = m.date ? fmtDate(m.date) : ""; el.classList.remove("err"); el.removeAttribute("aria-invalid"); if (hint) { hint.className = "tiny muted"; hint.textContent = "Type a date like 20/11/2026 or 20 Nov 2026, or pick one."; } }
+    else { el.classList.add("err"); el.setAttribute("aria-invalid", "true"); if (hint) { hint.className = "err-text"; hint.textContent = m.dateErr; } }
+    return;
+  }
   if (el.dataset.input === "lib-sort") { UI.lib.sort = el.value; render(); }
   if (el.dataset.actChange && act[el.dataset.actChange]) act[el.dataset.actChange](el.dataset, el);
   if (el.dataset.input === "imp-file" && el.files && el.files[0]) {
@@ -2408,6 +2844,24 @@ document.addEventListener("focusout", (ev) => {
     if (S.states[id] && (S.states[id].notes || null) !== v) { const u = setField(id, "notes", v); toast("Notes saved", () => { u(); render(); }); }
   }
 });
+// Discover tiles: a small 3D tilt that follows a mouse or trackpad pointer. Touch, pens and reduced-motion users get the static highlight.
+let tiltEl = null, tiltRaf = 0;
+const canTilt = () => matchMedia("(hover: hover) and (pointer: fine)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const untilt = (el) => { if (!el) return; el.classList.remove("tilting"); el.style.removeProperty("--rx"); el.style.removeProperty("--ry"); };
+document.addEventListener("pointermove", (ev) => {
+  if (ev.pointerType !== "mouse" || !canTilt()) return;
+  const t = ev.target.closest && ev.target.closest(".dtile");
+  if (tiltEl && tiltEl !== t) { untilt(tiltEl); tiltEl = null; }
+  if (!t) return;
+  tiltEl = t;
+  cancelAnimationFrame(tiltRaf);
+  tiltRaf = requestAnimationFrame(() => {
+    const r = t.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width - 0.5, y = (ev.clientY - r.top) / r.height - 0.5;
+    t.classList.add("tilting");
+    t.style.setProperty("--rx", (-y * 6).toFixed(2) + "deg"); t.style.setProperty("--ry", (x * 8).toFixed(2) + "deg");
+  });
+}, { passive: true });
+document.addEventListener("pointerout", (ev) => { if (tiltEl && !tiltEl.contains(ev.relatedTarget)) { cancelAnimationFrame(tiltRaf); untilt(tiltEl); tiltEl = null; } });
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h) && (h !== UI.tab || UI.detail)) go(h); });
 
 // ---------- boot ----------
@@ -2423,7 +2877,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 })();
 
 // Exposed for automated tests only.
-window.__reelnest = { Sync, createManual, markEpisodes, ensureState, setField, S, UI, progressOf, upNextOf, planThrough, planSeason, mergeState, parseBackup, planImport, exportJson, epOrder, airState };
+window.__reelnest = { Sync, createManual, markEpisodes, ensureState, setField, S, UI, addWatch, editWatch, parseDateInput, evDate, progressOf, upNextOf, planThrough, planSeason, mergeState, parseBackup, planImport, exportJson, epOrder, airState };
 </script>
 </body>
 </html>

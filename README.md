@@ -10,6 +10,7 @@ A private web app for tracking movies, TV series and anime from India and around
 | `config.js` | Public site settings (Supabase URL and anon key). Empty means local-only. |
 | `sw.js`, `manifest.webmanifest`, `icon*.png`, `icon.svg` | Offline support and home-screen install |
 | `supabase/schema.sql` | Cloud backup database: tables, per-account security rules, merge functions |
+| `supabase/migrations-2026-11-watch-source.sql` | Upgrade for databases created before watch dates and sources were added (already applied to this site's project) |
 | `relay-worker.js` | Optional Cloudflare relay for networks that block TMDB (deploy to Cloudflare, not GitHub Pages) |
 
 ## Hosting (GitHub Pages, free)
@@ -58,7 +59,7 @@ Without an account, everything stays in the browser. Clearing site data, private
 ### One-time setup (about 10 minutes)
 
 1. Create a free project at supabase.com.
-2. Open **SQL Editor › New query**, paste in all of `supabase/schema.sql`, and click **Run**. It's safe to run again later.
+2. Open **SQL Editor › New query**, paste in all of `supabase/schema.sql`, and click **Run**. It's safe to run again later. A database set up before November 2026 only needs `supabase/migrations-2026-11-watch-source.sql`.
 3. Under **Authentication › URL Configuration**, set **Site URL** to your GitHub Pages address, and add it under **Redirect URLs**.
 4. Under **Authentication › Email Templates › Magic Link**, add `{{ .Token }}` to the message so the email contains the 6-digit code. The sign-in link in the email works too.
 5. Under **Project Settings › API**, copy the **Project URL** and the **anon public** key into `config.js`. Commit it, or paste both into Profile › Backup & sync on one device to try it first.

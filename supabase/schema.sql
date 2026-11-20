@@ -64,6 +64,10 @@ create table if not exists public.rn_events (
   primary key (user_id, id)
 );
 
+-- Added later (safe to re-run): the calendar day of a watch and where it was watched.
+alter table public.rn_events add column if not exists watched_date text;
+alter table public.rn_events add column if not exists source jsonb;
+
 create table if not exists public.rn_tombstones (
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   entity_type text not null,
@@ -153,10 +157,10 @@ begin
      or excluded.rating_at > s.rating_at or excluded.notes_at > s.notes_at;
 
   -- Append-only history: new ids are inserted; an existing row only ever gains a deletion.
-  insert into rn_events as e (user_id, id, work_id, episode_id, watched_at, is_rewatch, created_at, deleted_at, device_id)
-  select uid, x.id, x.work_id, x.episode_id, x.watched_at, coalesce(x.is_rewatch, false), x.created_at, x.deleted_at, coalesce(x.device_id, '')
-  from jsonb_to_recordset(coalesce(payload->'events', '[]')) as x(id text, work_id text, episode_id text, watched_at bigint,
-       is_rewatch boolean, created_at bigint, deleted_at bigint, device_id text)
+  insert into rn_events as e (user_id, id, work_id, episode_id, watched_at, watched_date, is_rewatch, source, created_at, deleted_at, device_id)
+  select uid, x.id, x.work_id, x.episode_id, x.watched_at, x.watched_date, coalesce(x.is_rewatch, false), x.source, x.created_at, x.deleted_at, coalesce(x.device_id, '')
+  from jsonb_to_recordset(coalesce(payload->'events', '[]')) as x(id text, work_id text, episode_id text, watched_at bigint, watched_date text,
+       is_rewatch boolean, source jsonb, created_at bigint, deleted_at bigint, device_id text)
   on conflict (user_id, id) do update set deleted_at = least(coalesce(e.deleted_at, excluded.deleted_at), excluded.deleted_at)
   where excluded.deleted_at is not null and (e.deleted_at is null or excluded.deleted_at < e.deleted_at);
 
