@@ -318,6 +318,9 @@ a.btn { text-decoration: none; color: inherit; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; }
 details summary { cursor: pointer; font-weight: 600; }
 
+.gsi-slot { min-height: 44px; display: flex; align-items: center; }
+.divider-or { display: flex; align-items: center; gap: 10px; color: var(--ink-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.divider-or::before, .divider-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 /* ---------- cast ---------- */
 .cast-row { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 116px; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
   scroll-snap-type: x proximity; padding: 2px 2px 8px; margin: 0 -2px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
@@ -1067,7 +1070,9 @@ async function ensureEpisodes(id, force) {
 const CloudCfg = {
   url() { return ((storage.get("reelnest.sbUrl") || (window.REELNEST_CONFIG || {}).supabaseUrl || "") + "").trim().replace(/\/+$/, ""); },
   key() { return ((storage.get("reelnest.sbKey") || (window.REELNEST_CONFIG || {}).supabaseAnonKey || "") + "").trim(); },
-  google() { return !!(window.REELNEST_CONFIG || {}).googleSignIn; },
+  google() { return !!(window.REELNEST_CONFIG || {}).googleSignIn && !!this.googleId(); },
+  /** Public OAuth client ID (not a secret). Google sign-in uses ID tokens, so no client secret is needed anywhere. */
+  googleId() { return (((window.REELNEST_CONFIG || {}).googleClientId || "") + "").trim(); },
   configured() { return !IN_SANDBOX && !!(this.url() && this.key()); },
 };
 const camelState = (r) => ({ workId: r.work_id, interest: r.interest, interestAt: +r.interest_at, status: r.status, statusAt: +r.status_at, watchlist: !!r.watchlist,
@@ -1144,7 +1149,12 @@ const Sync = {
     this.setSession(r);
     await this.afterSignIn();
   },
-  googleUrl() { return `${CloudCfg.url()}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`; },
+  /** Exchange a Google ID token for a ReelNest session. Supabase checks the token's signature, audience (our client ID) and nonce. */
+  async googleIdToken(idToken, rawNonce) {
+    const r = await this.http("/auth/v1/token?grant_type=id_token", { method: "POST", body: JSON.stringify({ provider: "google", id_token: idToken, nonce: rawNonce }) }, false);
+    this.setSession(r);
+    await this.afterSignIn();
+  },
   /** Magic-link and Google sign-in return tokens in the URL fragment. */
   async consumeRedirect() {
     const h = location.hash.slice(1);
@@ -1788,8 +1798,10 @@ function syncCard(storageLine) {
            <div style="display:grid;gap:8px;margin-top:8px"><div class="field"><label for="sb-code">Code from the email</label><input id="sb-code" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></div>
            <div><button class="btn" data-act="sb-verify" ${a.busy ? "disabled" : ""}>${a.busy ? "Checking…" : "Sign in with code"}</button></div></div></details>`
       : `<div class="field"><label for="sb-email">Email</label><input id="sb-email" class="input" type="email" autocomplete="email" value="${esc(a.email)}"></div>
-         <div class="wrap-chips">${CloudCfg.google() ? `<a class="btn primary" href="${esc(Sync.googleUrl())}">Continue with Google</a>` : ""}<button class="btn ${CloudCfg.google() ? "" : "primary"}" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in link"}</button></div>
-         ${CloudCfg.google() ? `<p class="tiny muted" style="margin:0">Use the same Google account on every device and your library stays in sync.</p>` : ""}`;
+         ${CloudCfg.google() ? `<div id="gsi-btn" class="gsi-slot" aria-busy="true"><span class="tiny muted">Loading Google sign-in…</span></div>
+           <p class="tiny muted" style="margin:0">Use the same Google account on every device and your library stays in sync.</p>
+           <div class="divider-or"><span>or</span></div>` : ""}
+         <div class="wrap-chips"><button class="btn ${CloudCfg.google() ? "" : "primary"}" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in link"}</button></div>`;
     return `<div class="card panel"><div><b>Local only</b> <span class="pill">Cloud backup off</span></div>${localWarn}
       <p class="small muted" style="margin:0">Sign in to back up and sync. An account is optional; everything works without one. If this device already has titles, you'll be asked how to merge them. Nothing is replaced.</p>
       ${form}${a.msg ? `<p class="small" role="status" style="margin:0;color:${a.msgErr ? "var(--warn)" : "var(--ink-muted)"}">${esc(a.msg)}</p>` : ""}
@@ -2466,6 +2478,49 @@ function applyTheme() {
   if (th === "dark" || th === "light") document.documentElement.setAttribute("data-theme", th);
   else if (!IN_SANDBOX) document.documentElement.removeAttribute("data-theme");
 }
+// ---------- Google sign-in button (Google Identity Services) ----------
+const Gsi = {
+  loading: null, failed: false,
+  load() {
+    if (window.google && google.accounts && google.accounts.id) return Promise.resolve();
+    if (this.loading) return this.loading;
+    this.loading = new Promise((res, rej) => {
+      const sc = document.createElement("script");
+      sc.src = "https://accounts.google.com/gsi/client"; sc.async = true;
+      sc.onload = () => res(); sc.onerror = () => { this.loading = null; rej(new Error("gsi")); };
+      document.head.appendChild(sc);
+    });
+    return this.loading;
+  },
+  async mount() {
+    const slot = document.getElementById("gsi-btn");
+    if (!slot || slot.dataset.mounted) return;
+    slot.dataset.mounted = "1";
+    try {
+      await this.load();
+      // A fresh nonce for every button: Google signs its hash into the token, Supabase checks it against the raw value.
+      const raw = uuid() + uuid();
+      const dig = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+      const hashed = [...new Uint8Array(dig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const target = document.getElementById("gsi-btn");
+      if (!target) return;
+      google.accounts.id.initialize({ client_id: CloudCfg.googleId(), nonce: hashed, callback: (resp) => Gsi.done(resp, raw), ux_mode: "popup", itp_support: true, use_fedcm_for_button: true, auto_select: false });
+      target.innerHTML = ""; target.removeAttribute("aria-busy");
+      const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+      google.accounts.id.renderButton(target, { type: "standard", theme: dark ? "filled_black" : "outline", size: "large", text: "continue_with", shape: "pill", logo_alignment: "left", width: Math.max(220, Math.min(340, target.clientWidth || 300)) });
+    } catch (e) {
+      const t = document.getElementById("gsi-btn");
+      if (t) { t.removeAttribute("aria-busy"); t.innerHTML = `<span class="tiny muted">Google sign-in couldn't load here (offline or blocked). The email link below still works.</span>`; }
+    }
+  },
+  async done(resp, raw) {
+    if (!resp || !resp.credential) return;
+    Object.assign(Sync.auth, { busy: true, msg: "Signing in with Google…", msgErr: false }); render();
+    try { await Sync.googleIdToken(resp.credential, raw); Object.assign(Sync.auth, { busy: false, msg: "" }); }
+    catch (e) { Object.assign(Sync.auth, { busy: false, msgErr: true, msg: "Google sign-in didn't complete: " + Sync.message(e) }); }
+    render();
+  },
+};
 function render() {
   const main = document.getElementById("main");
   const active = document.activeElement;
@@ -2474,6 +2529,7 @@ function render() {
   renderNav();
   main.innerHTML = UI.detail ? viewDetail(UI.detail) : ({ home: viewHome, discover: viewDiscover, library: viewLibrary, calendar: viewCalendar, profile: viewProfile }[UI.tab])();
   renderModal();
+  if (document.getElementById("gsi-btn")) Gsi.mount();
   if (keepId) {
     const el = document.getElementById(keepId);
     if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} }

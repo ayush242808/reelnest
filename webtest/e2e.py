@@ -90,7 +90,7 @@ def tmdb(route):
 
 def new_page(browser, w=1280, h=900, dark=True, cloud=True, key=True):
     ctx = browser.new_context(viewport={"width": w, "height": h}, color_scheme="dark" if dark else "light")
-    ctx.route("**/*", lambda r: supabase(r) if urlparse(r.request.url).hostname == "test.supabase.co"
+    ctx.route("**/*", lambda r: r.abort() if urlparse(r.request.url).hostname == "accounts.google.com" else supabase(r) if urlparse(r.request.url).hostname == "test.supabase.co"
               else tmdb(r) if urlparse(r.request.url).hostname not in (None, "") and "fonts" not in r.request.url else r.continue_())
     pg = ctx.new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))

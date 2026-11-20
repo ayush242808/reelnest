@@ -4,5 +4,7 @@
 window.REELNEST_CONFIG = {
   supabaseUrl: "https://gedkntwwjrpfklgvbjtp.supabase.co",
   supabaseAnonKey: "sb_publishable_IAguwzSvnD_1DqFE_LIv9g_aPIBhm_z", // publishable key (public)
-  googleSignIn: true,    // Google provider enabled in Supabase › Authentication › Providers
+  // Google sign-in uses Google ID tokens, so only the public client ID is needed (no client secret).
+  googleSignIn: true,
+  googleClientId: "437401470628-74k20iojq0gijfukh9fp24hp2d3uql9g.apps.googleusercontent.com",
 };
