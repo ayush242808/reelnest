@@ -905,9 +905,17 @@ const IN_SANDBOX = !!(window.claude && typeof window.claude.use === "function") 
 const Catalog = {
   key() { return storage.get("reelnest.tmdbKey") || ""; },
   relay() { return (storage.get("reelnest.tmdbRelay") || "").trim().replace(/\/+$/, ""); },
-  status() { return IN_SANDBOX ? "sandbox" : this.key() || this.relay() ? "ready" : "nokey"; },
-  // TMDB is blocked by some Indian ISPs (notably Jio). Try the official second hostname, then a user relay.
-  hosts() { const r = this.relay(); return r ? [r + "/3/"] : ["https://api.themoviedb.org/3/", "https://api.tmdb.org/3/"]; },
+  /** The site's shared relay (holds the owner's TMDB key on the server), so visitors need no key of their own. */
+  shared() { return (((window.REELNEST_CONFIG || {}).tmdbRelay || "") + "").trim().replace(/\/+$/, ""); },
+  status() { return IN_SANDBOX ? "sandbox" : this.key() || this.relay() || this.shared() ? "ready" : "nokey"; },
+  // TMDB is blocked by some Indian ISPs (notably Jio). Your own relay wins; with your own key, go direct and fall back
+  // to the shared relay; with no key, use the shared relay.
+  hosts() {
+    const r = this.relay(), sh = this.shared(), direct = ["https://api.themoviedb.org/3/", "https://api.tmdb.org/3/"];
+    if (r) return [r + "/3/"];
+    if (this.key()) return sh ? [...direct, sh + "/3/"] : direct;
+    return sh ? [sh + "/3/"] : direct;
+  },
   goodHost: null,
   /** Every place a TMDB image can come from, best first. Some Indian networks block image.tmdb.org but not media.themoviedb.org. */
   imgs(path, size = "w342") {
@@ -918,6 +926,7 @@ const Catalog = {
     const list = [`https://image.tmdb.org/t/p/${size}${path}`, `https://media.themoviedb.org/t/p/${size}${path}`,
       `https://wsrv.nl/?url=${encodeURIComponent(src)}`, `https://images.weserv.nl/?url=${encodeURIComponent(src)}`];
     if (r) list.unshift(`${r}/img/${size}${path}`);
+    else if (this.shared()) list.splice(2, 0, `${this.shared()}/img/${size}${path}`); // after TMDB's own hosts, before the public caches
     const good = this.goodImgHost;
     return good ? [...list.filter((u) => u.startsWith(good)), ...list.filter((u) => !u.startsWith(good))] : list;
   },
@@ -931,7 +940,9 @@ const Catalog = {
     for (const host of order) {
       const url = new URL(host + path);
       const headers = { Accept: "application/json" };
-      if (key) { if (key.startsWith("eyJ")) headers.Authorization = "Bearer " + key; else url.searchParams.set("api_key", key); }
+      // The shared relay adds the site's own key on the server; never pass a visitor's personal key through it.
+      const viaShared = this.shared() && host.startsWith(this.shared() + "/");
+      if (key && !viaShared) { if (key.startsWith("eyJ")) headers.Authorization = "Bearer " + key; else url.searchParams.set("api_key", key); }
       for (const [k, v] of Object.entries(params)) if (v !== null && v !== undefined && v !== "") url.searchParams.set(k, v);
       try {
         const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 9000);
@@ -941,7 +952,7 @@ const Catalog = {
         break;
       } catch (e) { res = null; /* blocked, reset or timed out: try the next host */ }
     }
-    if (!res) throw { code: navigator.onLine === false ? "offline" : this.relay() ? "relay" : "blocked" };
+    if (!res) throw { code: navigator.onLine === false ? "offline" : this.relay() ? "relay" : this.shared() ? "sharedblocked" : "blocked" };
     if (res.status === 401 || res.status === 403) throw { code: "unauthorized" };
     if (res.status === 404) throw { code: "notfound" };
     if (res.status === 429) throw { code: "ratelimited" };
@@ -956,6 +967,7 @@ const Catalog = {
       network: "Couldn't reach TMDB. Check your connection and try again.",
       blocked: "Couldn't reach TMDB. Some Indian networks (Jio especially) block it. Set up the free relay in Profile › Catalog, or switch your phone's Private DNS to dns.google.",
       relay: "Couldn't reach your catalog relay. Check its address in Profile › Catalog.",
+      sharedblocked: "Couldn't reach TMDB or this site's catalog connection. Check your internet connection. On some Indian networks (Jio especially), setting your phone's Private DNS to dns.google helps.",
       unauthorized: "TMDB rejected the API key. Check it in Profile.",
       ratelimited: "TMDB is limiting requests right now. Try again in a moment.",
       notfound: "TMDB no longer has this entry.",
@@ -1692,7 +1704,10 @@ function viewProfile() {
 
   if (!IN_SANDBOX) {
     h += `<section class="section"><div class="section-head"><h2>Catalog</h2></div><div class="card panel">
-      <p class="small" style="margin:0">Search and episode lists come from TMDB. Get a free API key at themoviedb.org › Settings › API (a VPN may be needed just to sign up from India). ${Sync.signedIn() && Sync.active() ? "It's kept in this browser and synced privately to your signed-in account, so your other devices get it too. It's never put in backup files." : "It's stored only in this browser and never put in backup files. Sign in under Backup &amp; sync to have it on your other devices too."}</p>
+      <p class="small" style="margin:0">Search and episode lists come from TMDB. ${Catalog.shared()
+        ? "This site includes a shared catalog connection, so no key is needed. You can optionally add your own free key from themoviedb.org › Settings › API."
+        : "Get a free API key at themoviedb.org › Settings › API (a VPN may be needed just to sign up from India)."}
+        ${Sync.signedIn() && Sync.active() ? "A key you add is kept in this browser and synced privately to your signed-in account, so your other devices get it too." : "A key you add is stored only in this browser; sign in under Backup &amp; sync to have it on your other devices too."} It's never put in backup files.</p>
       <div class="field"><label for="tmdb-key">TMDB API key or read access token</label><input id="tmdb-key" class="input" type="password" autocomplete="off" value="${esc(Catalog.key())}"></div>
       <div class="field"><label for="tmdb-relay">Catalog relay address (for networks that block TMDB)</label><input id="tmdb-relay" class="input" inputmode="url" autocomplete="off" placeholder="https://reelnest-tmdb.yourname.workers.dev" value="${esc(Catalog.relay())}">
         <span class="tiny muted">Leave empty to connect directly. If Jio or your ISP blocks TMDB, deploy the free relay from the README and paste its address here. A relay that holds your key lets you leave the key field empty.</span></div>

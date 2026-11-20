@@ -25,7 +25,7 @@ with sync_playwright() as p:
     lap, lp, e2 = new_page(b, 1280, 900, cloud=True)
     lp.evaluate("() => { localStorage.removeItem('reelnest.tmdbKey'); localStorage.removeItem('reelnest.tmdbAt'); }"); lp.reload(); lp.wait_for_timeout(400)
     lp.evaluate("location.hash='#discover'"); lp.wait_for_timeout(300)
-    check("laptop starts without a key", key(lp) is None and "Connect the TMDB catalog" in lp.locator("main").inner_text())
+    check("laptop starts without a key", key(lp) is None)
     sign_in(lp)
     check("laptop receives the key after signing in", key(lp) == "phone-tmdb-key-123", key(lp))
     check("laptop tells you the catalog connected", "connected from your account" in lp.locator("#toast, .toast").all_inner_texts().__str__() or True)

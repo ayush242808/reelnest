@@ -91,3 +91,7 @@ Profile › Export backup produces a versioned JSON file (`reelnest-export` v1).
 `webtest/e2e.py` runs the real app in headless Chrome. TMDB is simulated with fixtures, and the Supabase server is the real `schema.sql` on a local PostgreSQL. `webtest/sql/tests.sql` tests the database rules directly.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB. Availability data comes from JustWatch. ReelNest doesn't stream or download anything.
+
+## Shared catalog (no key needed for visitors)
+
+`supabase/functions/tmdb/index.ts` is a Supabase Edge Function that forwards read-only TMDB requests and adds the site owner's TMDB key on the server, so family members can use the site without their own key. The key is stored only as the Supabase secret `TMDB_KEY` (Edge Functions › Secrets), never in this repository. Catalog requests are answered only for pages served from `https://ayush242808.github.io`, and JWT verification is off for this one function because visitors call it without signing in. `config.js` points `tmdbRelay` at it. Visitors who add their own key go to TMDB directly, and their key is never sent through the shared relay.

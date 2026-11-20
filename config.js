@@ -7,4 +7,6 @@ window.REELNEST_CONFIG = {
   // Google sign-in uses Google ID tokens, so only the public client ID is needed (no client secret).
   googleSignIn: true,
   googleClientId: "437401470628-74k20iojq0gijfukh9fp24hp2d3uql9g.apps.googleusercontent.com",
+  // Shared TMDB relay (Supabase Edge Function). The TMDB key lives on the server as a secret, never in this file.
+  tmdbRelay: "https://gedkntwwjrpfklgvbjtp.supabase.co/functions/v1/tmdb",
 };

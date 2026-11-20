@@ -148,10 +148,10 @@ with sync_playwright() as p:
     sec = pg.locator(".card", has_text="Where to watch in India")
     check("2 no-data title says 'No providers found' without claiming unavailability", "No providers found" in sec.inner_text() and "doesn't mean it can't be watched" in sec.inner_text())
     # provider error + retry
-    NET["tmdb_down"] = True; pg.click("[data-act=watch-refresh]"); pg.wait_for_timeout(600)
-    check("2 network error shown with retry", pg.locator(".card", has_text="Where to watch").locator("text=Try again").count() == 1)
-    NET["tmdb_down"] = False; pg.locator("text=Try again").first.click(); pg.wait_for_timeout(700)
-    check("2 retry recovers", pg.locator("text=Try again").count() == 0)
+    NET["tmdb_down"] = True; pg.click("[data-act=watch-refresh]"); pg.wait_for_timeout(1500)
+    check("2 network error shown with retry", pg.locator(".card", has_text="Where to watch").get_by_role("button", name="Try again").count() == 1)
+    NET["tmdb_down"] = False; pg.get_by_role("button", name="Try again").first.click(); pg.wait_for_timeout(700)
+    check("2 retry recovers", pg.get_by_role("button", name="Try again").count() == 0)
 
     # ===== 4: mark episode; Home card visible; Library progress =====
     tab(pg, "library"); pg.locator(".grid .tile", has_text="Panchayat").first.click(); pg.wait_for_timeout(900)
