@@ -1106,6 +1106,19 @@ const Sync = {
   saveOutbox() { storage.set("reelnest.outbox", JSON.stringify(this.outbox)); },
   mark(id) { if (this.applying || !this.active()) return; this.outbox[id] = (this.outbox[id] || 0) + 1; this.saveOutbox(); this.schedule(2500); },
   markMeta() { this.mark("__meta"); },
+  /** Catalog access (TMDB key + relay) travels in the signed-in user's private settings row, newest change wins.
+   *  It has its own timestamp so a device with no key can never overwrite one set elsewhere. Never put in backup files. */
+  catalogOut() { return { key: storage.get("reelnest.tmdbKey") || "", relay: storage.get("reelnest.tmdbRelay") || "", at: +(storage.get("reelnest.tmdbAt") || 0) }; },
+  catalogIn(c) {
+    if (!c || typeof c !== "object" || !(+c.at > +(storage.get("reelnest.tmdbAt") || 0))) return false;
+    const k = String(c.key || "").trim(), r = String(c.relay || "").trim();
+    if (r && !/^https:\/\/[^\s/]+/.test(r)) return false;
+    if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
+    if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
+    storage.set("reelnest.tmdbAt", String(+c.at));
+    Catalog.goodHost = null; UI.disc.items = []; UI.disc.genres = [];
+    return true;
+  },
   markAll() { for (const id of Object.keys(S.works)) this.outbox[id] = (this.outbox[id] || 0) + 1; this.outbox.__meta = 1; this.saveOutbox(); },
   schedule(ms) { if (!this.active()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.run(), ms); },
 
@@ -1244,7 +1257,7 @@ const Sync = {
   payload(ids) {
     const p = { works: [], episodes: [], states: [], events: [], tombstones: [] };
     for (const id of ids) {
-      if (id === "__meta") { p.settings = { body: S.settings, updated_at: S.settingsAt || 1 }; continue; }
+      if (id === "__meta") { const c = this.catalogOut(); p.settings = { body: { ...S.settings, catalog: c.at ? c : undefined }, updated_at: Math.max(S.settingsAt || 1, c.at) }; continue; }
       const w = S.works[id];
       if (w) {
         // Season "fetched" times are per device: each device downloads its own episode lists.
@@ -1262,6 +1275,7 @@ const Sync = {
   applyPull(r) {
     this.applying = true;
     const touched = new Set();
+    let catalogArrived = false;
     try {
       for (const row of r.works || []) {
         const local = S.works[row.id];
@@ -1315,11 +1329,14 @@ const Sync = {
         S.tombs[id] = { entityType: "work", entityId: id, deletedAt: +row.deleted_at, deviceId: row.device_id };
         touched.add(id);
       }
+      if (r.settings && r.settings.body && this.catalogIn(r.settings.body.catalog)) catalogArrived = true;
       if (r.settings && +r.settings.updated_at > (S.settingsAt || 0)) {
-        S.settings = { ...DEFAULT_SETTINGS, ...(r.settings.body || {}) }; S.settingsAt = +r.settings.updated_at; applyTheme();
+        const { catalog, ...body } = r.settings.body || {};
+        S.settings = { ...DEFAULT_SETTINGS, ...body }; S.settingsAt = +r.settings.updated_at; applyTheme();
       }
     } finally { this.applying = false; }
     Persist.saveQuiet([...touched]);
+    if (catalogArrived) { toast(Catalog.key() || Catalog.relay() ? "TMDB catalog connected from your account" : "Catalog settings updated from your account"); if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false); }
   },
 
   async deleteCloud() {
@@ -1675,7 +1692,7 @@ function viewProfile() {
 
   if (!IN_SANDBOX) {
     h += `<section class="section"><div class="section-head"><h2>Catalog</h2></div><div class="card panel">
-      <p class="small" style="margin:0">Search and episode lists come from TMDB. Get a free API key at themoviedb.org › Settings › API (a VPN may be needed just to sign up from India). It's stored only in this browser and never exported.</p>
+      <p class="small" style="margin:0">Search and episode lists come from TMDB. Get a free API key at themoviedb.org › Settings › API (a VPN may be needed just to sign up from India). ${Sync.signedIn() && Sync.active() ? "It's kept in this browser and synced privately to your signed-in account, so your other devices get it too. It's never put in backup files." : "It's stored only in this browser and never put in backup files. Sign in under Backup &amp; sync to have it on your other devices too."}</p>
       <div class="field"><label for="tmdb-key">TMDB API key or read access token</label><input id="tmdb-key" class="input" type="password" autocomplete="off" value="${esc(Catalog.key())}"></div>
       <div class="field"><label for="tmdb-relay">Catalog relay address (for networks that block TMDB)</label><input id="tmdb-relay" class="input" inputmode="url" autocomplete="off" placeholder="https://reelnest-tmdb.yourname.workers.dev" value="${esc(Catalog.relay())}">
         <span class="tiny muted">Leave empty to connect directly. If Jio or your ISP blocks TMDB, deploy the free relay from the README and paste its address here. A relay that holds your key lets you leave the key field empty.</span></div>
@@ -2791,8 +2808,10 @@ const act = {
     const k = document.getElementById("tmdb-key").value.trim(), l = document.getElementById("tmdb-lang").value.trim() || "en-US";
     const r = document.getElementById("tmdb-relay").value.trim();
     if (r && !/^https:\/\/[^\s/]+/.test(r)) { toast("The relay address must start with https://"); return; }
+    const changed = k !== (storage.get("reelnest.tmdbKey") || "") || r !== (storage.get("reelnest.tmdbRelay") || "");
     if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
     if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
+    if (changed) storage.set("reelnest.tmdbAt", String(now()));
     Catalog.goodHost = null;
     S.settings.lang = l; S.settingsAt = now(); Persist.touchMeta(); UI.disc.items = []; UI.disc.genres = []; render(); toast("Catalog settings saved");
   },
@@ -2942,6 +2961,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
   if (TABS.some((t) => t[0] === h)) UI.tab = h;
   render();
   Persist.init().then(async () => {
+    if ((storage.get("reelnest.tmdbKey") || storage.get("reelnest.tmdbRelay")) && !storage.get("reelnest.tmdbAt")) { storage.set("reelnest.tmdbAt", String(now())); Sync.markMeta(); }
     if (CloudCfg.configured()) { await Sync.consumeRedirect(); if (Sync.active()) Sync.run(); render(); }
   });
   if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false);
