@@ -318,7 +318,14 @@ a.btn { text-decoration: none; color: inherit; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; }
 details summary { cursor: pointer; font-weight: 600; }
 
+.signin { display: grid; gap: 16px; max-width: 440px; }
 .gsi-slot { min-height: 44px; display: flex; align-items: center; }
+/* Google's button lives in a light-scheme iframe; matching its scheme stops browsers painting a white box behind it on dark pages. */
+.gsi-slot iframe { color-scheme: light; background: transparent !important; }
+.gsi-slot > div { background: transparent !important; }
+.email-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.email-row .btn { min-height: 48px; }
+@media (max-width: 380px) { .email-row { grid-template-columns: 1fr; } }
 .divider-or { display: flex; align-items: center; gap: 10px; color: var(--ink-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
 .divider-or::before, .divider-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 /* ---------- cast ---------- */
@@ -1797,11 +1804,14 @@ function syncCard(storageLine) {
          <details><summary class="small muted">The email has a code instead?</summary>
            <div style="display:grid;gap:8px;margin-top:8px"><div class="field"><label for="sb-code">Code from the email</label><input id="sb-code" class="input" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></div>
            <div><button class="btn" data-act="sb-verify" ${a.busy ? "disabled" : ""}>${a.busy ? "Checking…" : "Sign in with code"}</button></div></div></details>`
-      : `<div class="field"><label for="sb-email">Email</label><input id="sb-email" class="input" type="email" autocomplete="email" value="${esc(a.email)}"></div>
-         ${CloudCfg.google() ? `<div id="gsi-btn" class="gsi-slot" aria-busy="true"><span class="tiny muted">Loading Google sign-in…</span></div>
-           <p class="tiny muted" style="margin:0">Use the same Google account on every device and your library stays in sync.</p>
+      : `<div class="signin">
+         ${CloudCfg.google() ? `<div style="display:grid;gap:8px"><div id="gsi-btn" class="gsi-slot" aria-busy="true"><span class="tiny muted">Loading Google sign-in…</span></div>
+           <p class="tiny muted" style="margin:0">Use the same Google account on every device and your library stays in sync.</p></div>
            <div class="divider-or"><span>or</span></div>` : ""}
-         <div class="wrap-chips"><button class="btn ${CloudCfg.google() ? "" : "primary"}" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : "Email me a sign-in link"}</button></div>`;
+         <div class="field"><label for="sb-email">${CloudCfg.google() ? "Get a sign-in link by email" : "Email"}</label>
+           <div class="email-row"><input id="sb-email" class="input" type="email" autocomplete="email" placeholder="you@example.com" value="${esc(a.email)}">
+             <button class="btn ${CloudCfg.google() ? "" : "primary"}" data-act="sb-send" ${a.busy ? "disabled" : ""}>${a.busy ? "Sending…" : CloudCfg.google() ? "Send link" : "Email me a sign-in link"}</button></div></div>
+         </div>`;
     return `<div class="card panel"><div><b>Local only</b> <span class="pill">Cloud backup off</span></div>${localWarn}
       <p class="small muted" style="margin:0">Sign in to back up and sync. An account is optional; everything works without one. If this device already has titles, you'll be asked how to merge them. Nothing is replaced.</p>
       ${form}${a.msg ? `<p class="small" role="status" style="margin:0;color:${a.msgErr ? "var(--warn)" : "var(--ink-muted)"}">${esc(a.msg)}</p>` : ""}
@@ -2512,7 +2522,7 @@ const Gsi = {
       if (!target) return;
       target.innerHTML = ""; target.removeAttribute("aria-busy");
       const dark = document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-      google.accounts.id.renderButton(target, { type: "standard", theme: dark ? "filled_black" : "outline", size: "large", text: "continue_with", shape: "pill", logo_alignment: "left", width: Math.max(220, Math.min(340, target.clientWidth || 300)) });
+      google.accounts.id.renderButton(target, { type: "standard", theme: dark ? "filled_black" : "outline", size: "large", text: "continue_with", shape: "pill", logo_alignment: "left", width: Math.max(220, Math.min(400, target.clientWidth || 320)) });
     } catch (e) {
       const t = document.getElementById("gsi-btn");
       if (t) { t.removeAttribute("aria-busy"); t.innerHTML = `<span class="tiny muted">Google sign-in couldn't load here (offline or blocked). The email link below still works.</span>`; }
