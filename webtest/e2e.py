@@ -85,6 +85,7 @@ def tmdb(route):
     p = u.path.replace("/3/", "/")
     data = (PROV_TV if p.endswith("/tv/61145/watch/providers") else {"results": {}} if p.endswith("/watch/providers")
             else SEASON if "/season/" in p else TV if p.startswith("/tv/") else MOVIE if p.startswith("/movie/")
+            else {"page": 1, "total_pages": 1, "results": [r for r in TRENDING["results"] if r["media_type"] == ("movie" if "discover/movie" in p else "tv")]} if "discover/" in p
             else TRENDING if ("trending" in p or "search" in p) else {"genres": []})
     return route.fulfill(status=200, content_type="application/json", headers={"Access-Control-Allow-Origin": "*"}, body=json.dumps(data))
 

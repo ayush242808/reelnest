@@ -470,7 +470,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=16"></script>
+<script src="config.js?v=17"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -639,7 +639,7 @@ const UI = {
   tab: "home", detail: null, openSeasons: {}, menu: null, modal: null, loading: true, loadNote: null, saveError: null,
   lib: { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null, sort: "updated" },
   disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null,
-    seeAll: false, rows: { trending: [], india: [], indiaTv: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null },
+    seeAll: false, rows: { movies: [], series: [], india: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null },
   reveal: {},
 };
 const DEVICE = (() => { const k = "reelnest.device"; let d = storage.get(k); if (!d) { d = "web-" + uuid().slice(0, 8); storage.set(k, d); } return d; })();
@@ -1535,17 +1535,39 @@ function viewDiscover() {
   return h;
 }
 // ---------- Discover home: rows shown instantly from a saved copy, refreshed in the background once a day ----------
+const monthsAgo = (n) => { const d = new Date(); d.setMonth(d.getMonth() - n); return isoOf(d); };
+// TV genres kept out of "best series": Kids, News, Reality, Soap (daily serials), Talk, and Animation (anime has its own row).
+const TV_SKIP = "16,10762,10763,10764,10766,10767";
+/** Each row: first recent, currently popular titles that are well rated; then gradually older titles with a higher bar.
+ *  Quality comes from TMDB's audience rating with a minimum number of votes (IMDb/Letterboxd/Rotten Tomatoes aren't in the licensed catalog). */
 const DISC_ROWS = [
-  { k: "trending", title: "Trending this week", path: "trending/all/week" },
-  { k: "india", title: "Popular Indian movies", path: "discover/movie", forced: "MOVIE", params: { with_origin_country: "IN", sort_by: "popularity.desc", "vote_count.gte": 10 } },
-  { k: "indiaTv", title: "Popular Indian series", path: "discover/tv", forced: "SERIES", params: { with_origin_country: "IN", sort_by: "popularity.desc", "vote_count.gte": 5 } },
-  { k: "anime", title: "Popular anime", path: "discover/tv", forced: "SERIES", params: { with_genres: 16, with_original_language: "ja", sort_by: "popularity.desc", "vote_count.gte": 20 } },
+  { k: "movies", title: "Best movies right now", forced: "MOVIE", tiers: () => [
+    ["discover/movie", { sort_by: "popularity.desc", "primary_release_date.gte": monthsAgo(12), "primary_release_date.lte": today(), "vote_average.gte": 7, "vote_count.gte": 150 }],
+    ["discover/movie", { sort_by: "primary_release_date.desc", "primary_release_date.lte": monthsAgo(12), "vote_average.gte": 7.6, "vote_count.gte": 2000 }]] },
+  { k: "series", title: "Best series right now", forced: "SERIES", tiers: () => [
+    ["discover/tv", { sort_by: "popularity.desc", "air_date.gte": monthsAgo(6), without_genres: TV_SKIP, "vote_average.gte": 7.3, "vote_count.gte": 100 }],
+    ["discover/tv", { sort_by: "first_air_date.desc", "first_air_date.lte": monthsAgo(12), without_genres: TV_SKIP, "vote_average.gte": 7.8, "vote_count.gte": 800 }]] },
+  { k: "india", title: "Best Indian movies", forced: "MOVIE", tiers: () => [
+    ["discover/movie", { with_origin_country: "IN", sort_by: "popularity.desc", "primary_release_date.gte": monthsAgo(18), "primary_release_date.lte": today(), "vote_average.gte": 6.8, "vote_count.gte": 15 }],
+    ["discover/movie", { with_origin_country: "IN", sort_by: "primary_release_date.desc", "primary_release_date.lte": monthsAgo(18), "vote_average.gte": 7.3, "vote_count.gte": 150 }]] },
+  { k: "anime", title: "Popular anime", forced: "SERIES", tiers: () => [
+    ["discover/tv", { with_genres: 16, with_original_language: "ja", sort_by: "popularity.desc", "vote_count.gte": 20 }]] },
 ];
+/** One page of a row: recent-and-popular first, then the older top-rated ones, without repeats or poster-less entries. */
+async function rowFetch(row, page) {
+  const lang = S.settings.lang;
+  const settled = await Promise.allSettled(row.tiers().map(([path, params]) => Catalog.call(path, { language: lang, include_adult: "false", page, ...params })));
+  const res = settled.filter((x) => x.status === "fulfilled").map((x) => x.value);
+  if (!res.length) throw settled[0].reason; // one tier running out of pages is fine; all failing is an error
+  const seen = new Set(), items = [];
+  for (const r of res) for (const x of r.results || []) { const it = Catalog.item(x, row.forced); if (it && it.posterPath && !seen.has(it.key)) { seen.add(it.key); items.push(it); } }
+  return { items, pages: Math.max(...res.map((r) => r.total_pages || 1)) };
+}
 const DISC_TTL = 864e5; // refresh at most once a day
 const discIsHome = () => { const d = UI.disc; return !d.q.trim() && d.type === "all" && !d.seeAll && ![d.year, d.lang, d.country, d.genre].some(Boolean); };
 const discCacheKey = () => `${S.settings.lang}|${region()}`;
 function discCacheRead() {
-  try { const c = JSON.parse(storage.get("reelnest.discCache") || "null"); return c && c.v === 1 && c.key === discCacheKey() ? c : null; } catch { return null; }
+  try { const c = JSON.parse(storage.get("reelnest.discCache") || "null"); return c && c.v === 2 && c.key === discCacheKey() ? c : null; } catch { return null; }
 }
 function discFind(key) { const d = UI.disc; return d.items.find((i) => i.key === key) || Object.values(d.rows).flat().find((i) => i.key === key); }
 async function discoverHome(force) {
@@ -1555,21 +1577,20 @@ async function discoverHome(force) {
   if (!force && fresh) { render(); return; }
   if (d.rowsLoading) return;
   d.rowsLoading = true; d.rowsError = null; render();
-  const lang = S.settings.lang;
-  const res = await Promise.allSettled(DISC_ROWS.map((r) => Catalog.call(r.path, { language: lang, include_adult: "false", ...(r.params || {}) })
-    .then((x) => (x.results || []).map((it) => Catalog.item(it, r.forced)).filter(Boolean))));
+  const res = await Promise.allSettled(DISC_ROWS.map((r) => rowFetch(r, 1).then((x) => x.items.slice(0, 20))));
   d.rowsLoading = false;
   const got = {};
   res.forEach((r, i) => { if (r.status === "fulfilled" && r.value.length) got[DISC_ROWS[i].k] = r.value; });
-  if (!Object.keys(got).length) { d.rowsError = (res[0].reason && res[0].reason.code) || "network"; render(); return; }
+  if (!Object.keys(got).length && res.some((r) => r.status === "rejected")) { d.rowsError = (res.find((r) => r.reason).reason.code) || "network"; render(); return; }
   d.rows = { ...d.rows, ...got }; d.rowsAt = now();
   // Save only a complete set, so a partial answer is retried next time instead of being kept for a day.
-  if (DISC_ROWS.every((r) => got[r.k])) storage.set("reelnest.discCache", JSON.stringify({ v: 1, key: discCacheKey(), at: d.rowsAt, rows: d.rows }));
+  if (DISC_ROWS.every((r) => got[r.k])) storage.set("reelnest.discCache", JSON.stringify({ v: 2, key: discCacheKey(), at: d.rowsAt, rows: d.rows }));
   render();
 }
 function discHomeRows() {
   const d = UI.disc, any = DISC_ROWS.some((r) => (d.rows[r.k] || []).length);
   if (!any && d.rowsLoading) return skeleton();
+  if (!any && !d.rowsError) return emptyBlock("Nothing to show yet", "Search above for any movie, series or anime.", `<button class="btn" data-act="disc-refresh">Try again</button>`);
   if (!any && d.rowsError) return emptyBlock(d.rowsError === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.rowsError),
     `<button class="btn primary" data-act="disc-refresh">Try again</button><button class="btn" data-act="manual">Add manually</button>`);
   let h = DISC_ROWS.filter((r) => (d.rows[r.k] || []).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
@@ -1612,7 +1633,10 @@ async function discoverFetch(page) {
   const q = d.q.trim(), lang = S.settings.lang;
   try {
     let items = [], pages = 1, local = false;
-    if (q) {
+    const seeRow = d.seeAll && !q && d.type === "all" && ![d.year, d.lang, d.country, d.genre].some(Boolean) ? DISC_ROWS.find((r) => r.k === d.seeAll) : null;
+    if (seeRow) {
+      const r = await rowFetch(seeRow, page); items = r.items; pages = r.pages;
+    } else if (q) {
       const path = d.type === "movie" ? "search/movie" : d.type === "tv" ? "search/tv" : "search/multi";
       const r = await Catalog.call(path, { query: q, page, language: lang, include_adult: "false",
         primary_release_year: d.type === "movie" ? d.year : null, first_air_date_year: d.type === "tv" ? d.year : null });
@@ -2847,15 +2871,12 @@ const act = {
   "lib-clear": () => { Object.assign(UI.lib, { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null }); UI.modal = null; render(); },
   "lib-grid": () => { S.settings.grid = !S.settings.grid; S.settingsAt = now(); Persist.touchMeta(); render(); },
   // discover
-  "disc-type": (d) => { UI.disc.type = d.v; UI.disc.seeTitle = null; if (d.v === "all" && !UI.disc.year && !UI.disc.lang && !UI.disc.country && !UI.disc.genre) UI.disc.seeAll = false; discoverReload(false); },
+  "disc-type": (d) => { Object.assign(UI.disc, { type: d.v, seeTitle: null, seeAll: false }); discoverReload(false); },
   "disc-clear": () => { Object.assign(UI.disc, { q: "", type: "all", year: "", lang: "", country: "", genre: null, seeAll: false, seeTitle: null, items: [] }); discoverReload(false); window.scrollTo(0, 0); },
   "disc-refresh": () => discoverHome(true),
   "disc-see": (d) => {
-    const row = DISC_ROWS.find((r) => r.k === d.k), D = UI.disc;
-    Object.assign(D, { seeAll: true, seeTitle: row.title, items: [], q: "", year: "", lang: "", country: "", genre: null, type: "all" });
-    if (d.k === "india") Object.assign(D, { type: "movie", country: "IN" });
-    if (d.k === "indiaTv") Object.assign(D, { type: "tv", country: "IN" });
-    if (d.k === "anime") Object.assign(D, { type: "tv", genre: 16, lang: "ja" });
+    const row = DISC_ROWS.find((r) => r.k === d.k);
+    Object.assign(UI.disc, { seeAll: d.k, seeTitle: row.title, items: [], q: "", year: "", lang: "", country: "", genre: null, type: "all" });
     window.scrollTo(0, 0); discoverReload(false);
   },
   "disc-retry": () => discoverReload(false),

@@ -39,11 +39,12 @@ with sync_playwright() as p:
         if mode == "relay": pg.evaluate("localStorage.setItem('reelnest.tmdbRelay','https://relay.test')")
         else: pg.evaluate("localStorage.setItem('reelnest.tmdbKey','k123')")
         pg.goto(URL + "#discover"); pg.reload(); pg.wait_for_timeout(1200)
+        if pg.locator("#disc-q").count(): pg.locator("#disc-q").fill("pan"); pg.wait_for_timeout(1400)
         return ctx, pg, seen, errs
     # 1 direct host blocked -> fallback host works
     ctx, pg, seen, errs = run("direct-fallback")
-    check("fallback: trending shows titles (person filtered)", pg.locator(".dtile").count() == 2, pg.locator(".dtile").count())
-    check("fallback: used api.tmdb.org with key", any("api.tmdb.org/3/trending" in u and "api_key=k123" in u for u in seen), seen[:4])
+    check("fallback: results show titles (person filtered)", pg.locator(".dtile").count() == 2, pg.locator(".dtile").count())
+    check("fallback: used api.tmdb.org with key", any("api.tmdb.org/3/search" in u and "api_key=k123" in u for u in seen), seen[:4])
     pg.screenshot(path="/home/claude/webtest/09-discover-live.png")
     pg.locator(".dtile .dtile-open").first.click(); pg.wait_for_timeout(1200)
     check("fallback: detail + episodes load", pg.locator("h1", has_text="Panchayat").count()==1 and pg.locator(".ep-row").count()==2, pg.locator(".ep-row").count())
@@ -53,7 +54,7 @@ with sync_playwright() as p:
     check("fallback: no page errors", not errs, errs[:2]); ctx.close()
     # 2 relay with no key
     ctx, pg, seen, errs = run("relay")
-    check("relay: results via relay without api_key", pg.locator(".dtile").count()==2 and all("api_key" not in u for u in seen if "relay.test/3/" in u) and any("relay.test/3/trending" in u for u in seen), [u for u in seen if 'relay' in u][:3])
+    check("relay: results via relay without api_key", pg.locator(".dtile").count()==2 and all("api_key" not in u for u in seen if "relay.test/3/" in u) and any("relay.test/3/search" in u for u in seen), [u for u in seen if 'relay' in u][:3])
     check("relay: posters requested via relay", any("relay.test/img/w342/p.jpg" in u for u in seen))
     ctx.close()
     # 3 everything blocked

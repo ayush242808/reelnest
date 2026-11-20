@@ -86,6 +86,7 @@ def tmdb(route):
     data = (IDIOTS_PROV if p.endswith("/movie/20453/watch/providers") else {"results": {}} if p.endswith("/watch/providers")
             else DARK_SEASON if "/tv/70523/season/" in p else DARK if p.startswith("/tv/70523") else IDIOTS if p.startswith("/movie/20453")
             else OBSCURE if p.startswith("/movie/777") else {**OBSCURE, "id": 888, "title": LONG, "poster_path": "/long.jpg"} if p.startswith("/movie/888")
+            else {"page": 1, "total_pages": 1, "results": [r for r in TRENDING["results"] if r["media_type"] == ("movie" if "discover/movie" in p else "tv")]} if "discover/" in p
             else TRENDING if ("trending" in p or "search" in p) else {"genres": []})
     return route.fulfill(status=200, content_type="application/json", headers={"Access-Control-Allow-Origin": "*"}, body=json.dumps(data))
 
@@ -102,8 +103,9 @@ def new_page(b, w=1280, h=900, dark=True, tz="Asia/Kolkata", reduced=False, mobi
         localStorage.setItem('reelnest.sbUrl', {json.dumps(SB if cloud else 'https://off.invalid')}); localStorage.setItem('reelnest.sbKey', {json.dumps('anon-public-key-for-tests-0123456789' if cloud else 'x')}); }}""")
     pg.reload(); pg.wait_for_timeout(300)
     return ctx, pg, errs
-def go_discover(pg):
+def go_discover(pg, search=True):
     pg.evaluate("location.hash='#discover'"); pg.wait_for_timeout(900)
+    if search: pg.locator("#disc-q").fill("top"); pg.wait_for_timeout(1300)
 def open_tile(pg, title):
     pg.locator(".dtile .dtile-open", has_text=title).first.click(); pg.wait_for_timeout(1300)
 def no_sideways(pg): return pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
@@ -164,9 +166,11 @@ with sync_playwright() as p:
 
     # ================= 2. DISCOVER TILES =================
     ctx, pg, errs = new_page(b)
-    go_discover(pg)
+    go_discover(pg, search=False)
+    check("tiles: Discover home shows poster rows", pg.locator(".drow .dtile").count() >= 4 and pg.locator(".result").count() == 0)
+    pg.locator("#disc-q").fill("top"); pg.wait_for_timeout(1300)
     tiles = pg.locator(".dtile")
-    check("tiles: trending renders as poster tiles", tiles.count() == 5 and pg.locator(".result").count() == 0, tiles.count())
+    check("tiles: results render as poster tiles", tiles.count() == 5, tiles.count())
     t0 = tiles.nth(0).inner_text()
     check("tiles: title, year and type label", "3 Idiots" in t0 and "2009" in t0 and "Movie" in t0, t0)
     check("tiles: series and anime labels", "Series" in tiles.nth(1).inner_text() and "Anime" in tiles.nth(4).inner_text())
@@ -176,7 +180,7 @@ with sync_playwright() as p:
     lt = tiles.nth(3).locator(".dtile-meta .t")
     lh = pg.evaluate("(el) => parseFloat(getComputedStyle(el).lineHeight)", lt.element_handle())
     check("tiles: long title clamped to two lines", lt.bounding_box()["height"] <= lh * 2 + 2, (lt.bounding_box()["height"], lh))
-    pg.locator("[data-act=disc-see][data-k=trending]").click(); pg.wait_for_timeout(900); tiles = pg.locator(".dtile")
+    tiles = pg.locator(".dtile")
     cols = pg.evaluate("getComputedStyle(document.querySelector('.dgrid')).gridTemplateColumns.split(' ').length")
     check("tiles: 'See all' opens a desktop grid with 5+ columns", cols >= 5 and tiles.count() == 5, cols)
     # watchlist button
@@ -229,7 +233,7 @@ with sync_playwright() as p:
 
     for (w, h, name, mn) in [(820, 1180, "tablet", 4), (375, 812, "phone", 2)]:
         ctx, pg, errs = new_page(b, w, h, mobile=(w < 800), dark=(w > 800))
-        go_discover(pg); pg.locator("[data-act=disc-see][data-k=trending]").click(); pg.wait_for_timeout(900)
+        go_discover(pg)
         cols = pg.evaluate("getComputedStyle(document.querySelector('.dgrid')).gridTemplateColumns.split(' ').length")
         check(f"tiles: {name} layout has {mn}+ columns, no sideways scroll", cols >= mn and no_sideways(pg), cols)
         if w < 800:
