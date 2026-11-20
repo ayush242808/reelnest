@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-tTSUIW8UTOZx85x0B/iB5g89XSV5RDu+ZwRZfhf2YB0=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -470,7 +471,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=17"></script>
+<script src="config.js?v=18"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -479,6 +480,8 @@ details summary { cursor: pointer; font-weight: 600; }
    ====================================================================== */
 
 // ---------- utilities ----------
+/** Only https:// links (optionally on an allowed host) may become href/src; anything else (javascript:, data:, ...) is dropped. */
+const safeUrl = (u, hosts) => { try { const x = new URL(String(u || "")); return x.protocol === "https:" && (!hosts || hosts.some((h) => x.hostname === h || x.hostname.endsWith("." + h))) ? x.href : ""; } catch { return ""; } };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "x" + Math.random().toString(36).slice(2) + Date.now().toString(36));
 const now = () => Date.now();
@@ -600,11 +603,14 @@ function planSeason(eps, season, watched, t) {
 // Merge rules (used by import): per-field newest-wins with a device tie-break; events: union, deletion wins.
 const FIELDS = [["interest", "interestAt"], ["status", "statusAt"], ["watchlist", "watchlistAt"], ["rating", "ratingAt"], ["notes", "notesAt"]];
 const newer = (aAt, aDev, bAt, bDev) => aAt > bAt || (aAt === bAt && (aDev || "") > (bDev || ""));
-function mergeState(local, remote, since = 0) {
+/** remoteWinsTies: the cloud copy is canonical (the server keeps the first of two equal timestamps), so on a tie the
+ *  device adopts it instead of keeping its own value; all devices then converge on the same answer. */
+function mergeState(local, remote, since = 0, remoteWinsTies = false) {
   const out = { ...local };
   const conflicts = [];
   for (const [f, at] of FIELDS) {
-    if (newer(remote[at] || 0, remote.deviceId, local[at] || 0, local.deviceId)) { out[f] = remote[f]; out[at] = remote[at]; }
+    const r = remote[at] || 0, l = local[at] || 0;
+    if (remoteWinsTies ? r >= l && (r > l || remote[f] !== local[f]) : newer(r, remote.deviceId, l, local.deviceId)) { out[f] = remote[f]; out[at] = remote[at]; }
   }
   // Only a real conflict when both sides wrote notes since the last successful sync; the losing text is kept for review.
   if (local.notes && remote.notes && local.notes !== remote.notes && (local.notesAt || 0) > since && (remote.notesAt || 0) > since)
@@ -928,7 +934,7 @@ const Catalog = {
   forgetHost() { this.goodHost = null; storage.del("reelnest.apiHost"); },
   /** Every place a TMDB image can come from, best first. Some Indian networks block image.tmdb.org but not media.themoviedb.org. */
   imgs(path, size = "w342") {
-    if (!path || IN_SANDBOX) return [];
+    if (!path || IN_SANDBOX || !/^\/[\w.-]{1,80}$/.test(path)) return [];
     const r = this.relay();
     const src = `image.tmdb.org/t/p/${size}${path}`;
     // Last resorts: wsrv.nl is a free open-source image cache that fetches from outside the blocked network.
@@ -1044,7 +1050,7 @@ const Catalog = {
       lastAir: this.date(d.last_air_date), nextEp: d.next_episode_to_air ? { s: d.next_episode_to_air.season_number, e: d.next_episode_to_air.episode_number, date: this.date(d.next_episode_to_air.air_date), name: d.next_episode_to_air.name } : null,
       budget: d.budget || null, revenue: d.revenue || null,
       imdb: d.imdb_id || d.external_ids?.imdb_id || null,
-      trailer: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
+      trailer: trailer && /^[\w-]{6,20}$/.test(trailer.key || "") ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
       origCountry: d.origin_country || [],
     };
   },
@@ -1118,6 +1124,18 @@ const Sync = {
   outbox: (() => { try { return JSON.parse(storage.get("reelnest.outbox") || "{}"); } catch { return {}; } })(), // id -> version, "__meta" for settings
   lastOk: +(storage.get("reelnest.lastSync") || 0),
   lastRev: +(storage.get("reelnest.lastRev") || 0),
+  /** Commit-safe change cursor from rn_pull_since (a Postgres transaction-id boundary). null = fetch everything. */
+  cursor: storage.get("reelnest.syncCursor") || null,
+  setCursor(c) { this.cursor = c || null; if (c) storage.set("reelnest.syncCursor", c); else storage.del("reelnest.syncCursor"); },
+  /** Pull changes since the cursor. Falls back to the older rev-based pull only if the server lacks rn_pull_since. */
+  async pull(full) {
+    try { return await this.rpc("rn_pull_since", { cursor: full ? null : this.cursor }); }
+    catch (e) {
+      if (!(e && (e.status === 404 || /rn_pull_since|PGRST202|Could not find the function/.test(e.message || "")))) throw e;
+      const r = await this.rpc("rn_pull", { since: full ? 0 : Math.max(0, this.lastRev - 50) });
+      return { ...r, cursor: null, legacyRev: r.rev };
+    }
+  },
   linkedUser: storage.get("reelnest.syncUser") || null,
   phase: "idle", error: null, timer: null, failures: 0, applying: false, auth: { step: "email", email: "", busy: false, msg: null },
 
@@ -1127,16 +1145,27 @@ const Sync = {
   saveOutbox() { storage.set("reelnest.outbox", JSON.stringify(this.outbox)); },
   mark(id) { if (this.applying || !this.active()) return; this.outbox[id] = (this.outbox[id] || 0) + 1; this.saveOutbox(); this.schedule(2500); },
   markMeta() { this.mark("__meta"); },
-  /** Catalog access (TMDB key + relay) travels in the signed-in user's private settings row, newest change wins.
-   *  It has its own timestamp so a device with no key can never overwrite one set elsewhere. Never put in backup files. */
-  catalogOut() { return { key: storage.get("reelnest.tmdbKey") || "", relay: storage.get("reelnest.tmdbRelay") || "", at: +(storage.get("reelnest.tmdbAt") || 0) }; },
+  /** Your own TMDB key/relay stay in this browser unless you opt in ("reelnest.tmdbSync" = "on").
+   *  "off": the account row carries only {sync:false} (no key), which also removes a copy uploaded earlier.
+   *  Unset ("legacy"): a device that already synced its key before this choice existed keeps doing so until you choose;
+   *  Profile says so. The record has its own timestamp so a device with no key can't overwrite one set elsewhere.
+   *  Never put in backup files. */
+  catalogMode() { const m = storage.get("reelnest.tmdbSync"); return m === "on" || m === "off" ? m : "legacy"; },
+  catalogOut() {
+    const at = +(storage.get("reelnest.tmdbAt") || 0), m = this.catalogMode();
+    if (m === "off") return { v: 2, sync: false, at };
+    const c = { key: storage.get("reelnest.tmdbKey") || "", relay: storage.get("reelnest.tmdbRelay") || "", at };
+    return m === "on" ? { v: 2, sync: true, ...c } : c;
+  },
   catalogIn(c) {
     if (!c || typeof c !== "object" || !(+c.at > +(storage.get("reelnest.tmdbAt") || 0))) return false;
+    if (c.sync === false) { storage.set("reelnest.tmdbSync", "off"); storage.set("reelnest.tmdbAt", String(+c.at)); return true; } // keep this device's own key
     const k = String(c.key || "").trim(), r = String(c.relay || "").trim();
     if (r && !/^https:\/\/[^\s/]+/.test(r)) return false;
     if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
     if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
     storage.set("reelnest.tmdbAt", String(+c.at));
+    if (c.sync === true) storage.set("reelnest.tmdbSync", "on");
     Catalog.forgetHost(); UI.disc.items = []; UI.disc.genres = [];
     return true;
   },
@@ -1224,7 +1253,7 @@ const Sync = {
     try { await this.http("/auth/v1/logout", { method: "POST" }); } catch {}
     this.session = null; storage.del("reelnest.session");
     this.linkedUser = null; storage.del("reelnest.syncUser");
-    this.outbox = {}; this.saveOutbox(); this.lastRev = 0; storage.del("reelnest.lastRev"); this.lastOk = 0; storage.del("reelnest.lastSync");
+    this.outbox = {}; this.saveOutbox(); this.lastRev = 0; storage.del("reelnest.lastRev"); this.setCursor(null); this.lastOk = 0; storage.del("reelnest.lastSync");
     this.phase = "idle"; this.error = null; render();
   },
 
@@ -1232,7 +1261,7 @@ const Sync = {
   async afterSignIn() {
     if (this.linkedUser === this.session.user.id) { this.run(); return; }
     let cloud;
-    try { cloud = await this.rpc("rn_pull", { since: 0 }); }
+    try { cloud = await this.pull(true); }
     catch (e) { this.error = this.message(e); render(); return; }
     const cloudIds = new Set((cloud.states || []).map((s) => s.work_id));
     const localIds = new Set(Object.keys(S.states));
@@ -1242,8 +1271,9 @@ const Sync = {
   },
   async link(cloud, uploadLocal) {
     this.linkedUser = this.session.user.id; storage.set("reelnest.syncUser", this.linkedUser);
-    this.lastRev = 0; storage.set("reelnest.lastRev", "0");
+    this.lastRev = +cloud.legacyRev || 0; storage.set("reelnest.lastRev", String(this.lastRev));
     this.applyPull(cloud);
+    this.setCursor(cloud.cursor);
     if (uploadLocal) this.markAll();
     await this.run();
   },
@@ -1254,7 +1284,7 @@ const Sync = {
     clearTimeout(this.timer);
     this.phase = "syncing"; render();
     try {
-      const pulled = await this.rpc("rn_pull", { since: Math.max(0, this.lastRev - 50) });
+      const pulled = await this.pull(false);
       this.applyPull(pulled);
       const snapshot = { ...this.outbox };
       const ids = Object.keys(snapshot);
@@ -1263,7 +1293,10 @@ const Sync = {
         for (const id of ids) if (this.outbox[id] === snapshot[id]) delete this.outbox[id]; // edits made during the push stay queued
         this.saveOutbox();
       }
-      this.lastRev = Math.max(this.lastRev, +pulled.rev || 0); storage.set("reelnest.lastRev", String(this.lastRev));
+      // The cursor is the oldest transaction still running when we pulled, so anything committed later is fetched next
+      // time (our own push included, harmlessly). Saved only after the whole cycle succeeded.
+      if (pulled.cursor) this.setCursor(pulled.cursor);
+      else { this.lastRev = Math.max(this.lastRev, +pulled.legacyRev || 0); storage.set("reelnest.lastRev", String(this.lastRev)); }
       this.lastOk = now(); storage.set("reelnest.lastSync", String(this.lastOk)); // only after the server confirmed
       this.phase = "idle"; this.error = null; this.failures = 0;
       if (this.pending()) this.schedule(1500);
@@ -1278,7 +1311,7 @@ const Sync = {
   payload(ids) {
     const p = { works: [], episodes: [], states: [], events: [], tombstones: [] };
     for (const id of ids) {
-      if (id === "__meta") { const c = this.catalogOut(); p.settings = { body: { ...S.settings, catalog: c.at ? c : undefined }, updated_at: Math.max(S.settingsAt || 1, c.at) }; continue; }
+      if (id === "__meta") { const c = this.catalogOut(); p.settings = { body: { ...S.settings, catalog: c.at || c.sync === false ? c : undefined }, updated_at: Math.max(S.settingsAt || 1, c.at) }; continue; }
       const w = S.works[id];
       if (w) {
         // Season "fetched" times are per device: each device downloads its own episode lists.
@@ -1329,8 +1362,13 @@ const Sync = {
         const remote = camelState(row), id = remote.workId, mine = S.states[id], tomb = S.tombs[id];
         if (!mine && tomb && tomb.deletedAt >= lastEdit(remote)) continue; // deleted here after that edit
         if (!mine) { S.states[id] = remote; if (tomb) delete S.tombs[id]; }
-        else {
-          const m = mergeState(mine, remote, this.lastOk);
+        else if (!this.outbox[id]) {
+          // Nothing of ours is waiting to upload, so the server already has our edits merged in: its copy is the answer.
+          // (This also undoes a far-future timestamp from a wrong device clock, which the server clamps.)
+          const added = [mine.addedAt, remote.addedAt].filter((x) => x > 0);
+          S.states[id] = { ...mine, ...remote, addedAt: added.length ? Math.min(...added) : 0 };
+        } else {
+          const m = mergeState(mine, remote, this.lastOk, true);
           const added = [mine.addedAt, remote.addedAt].filter((x) => x > 0);
           S.states[id] = { ...m.state, addedAt: added.length ? Math.min(...added) : 0 };
           S.conflicts = [...m.conflicts, ...S.conflicts].slice(0, 50);
@@ -1357,12 +1395,12 @@ const Sync = {
       }
     } finally { this.applying = false; }
     Persist.saveQuiet([...touched]);
-    if (catalogArrived) { toast(Catalog.key() || Catalog.relay() ? "TMDB catalog connected from your account" : "Catalog settings updated from your account"); if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false); }
+    if (catalogArrived) { toast(Sync.catalogMode() === "off" ? "Key syncing is off for your account; this device keeps its own key" : Catalog.key() || Catalog.relay() ? "TMDB catalog connected from your account" : "Catalog settings updated from your account"); if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false); }
   },
 
   async deleteCloud() {
     await this.rpc("rn_delete_my_data", {});
-    this.lastRev = 0; storage.set("reelnest.lastRev", "0");
+    this.lastRev = 0; storage.set("reelnest.lastRev", "0"); this.setCursor(null);
   },
 };
 window.addEventListener("online", () => Sync.schedule(500));
@@ -1398,8 +1436,11 @@ function upcoming(lib, days) {
 /** <img> that walks through fallback hosts on error and remembers the first host that works. */
 function imgTag(urls, cls) {
   if (!urls.length) return "";
-  return `<img class="${cls}" src="${esc(urls[0])}" data-alts="${esc(urls.slice(1).join("|"))}" alt="" loading="lazy" onerror="imgFail(this)" onload="imgOk(this)">`;
+  return `<img class="${cls}" src="${esc(urls[0])}" data-alts="${esc(urls.slice(1).join("|"))}" alt="" loading="lazy" data-fb="1">`;
 }
+// Delegated (capturing) so no inline handlers are needed and the CSP can forbid them.
+document.addEventListener("error", (ev) => { const el = ev.target; if (el && el.tagName === "IMG" && el.dataset.fb) imgFail(el); }, true);
+document.addEventListener("load", (ev) => { const el = ev.target; if (el && el.tagName === "IMG" && el.dataset.fb) imgOk(el); }, true);
 window.imgFail = (el) => { const rest = (el.dataset.alts || "").split("|").filter(Boolean); if (rest.length) { el.dataset.alts = rest.slice(1).join("|"); el.src = rest[0]; } else el.remove(); };
 window.imgOk = (el) => { try { const host = new URL(el.src).origin; if (Catalog.goodImgHost !== host) { Catalog.goodImgHost = host; storage.set("reelnest.imgHost", host); } } catch {} };
 function poster(w, extra = "") {
@@ -1789,10 +1830,14 @@ function viewProfile() {
       <p class="small" style="margin:0">Search and episode lists come from TMDB. ${Catalog.shared()
         ? "This site includes a shared catalog connection, so no key is needed. You can optionally add your own free key from themoviedb.org › Settings › API."
         : "Get a free API key at themoviedb.org › Settings › API (a VPN may be needed just to sign up from India)."}
-        ${Sync.signedIn() && Sync.active() ? "A key you add is kept in this browser and synced privately to your signed-in account, so your other devices get it too." : "A key you add is stored only in this browser; sign in under Backup &amp; sync to have it on your other devices too."} It's never put in backup files.</p>
+        A key or relay address you add is stored in this browser${Sync.active() && Sync.catalogMode() !== "off" ? " and, because key syncing is on, in your private account row" : " only, unless you turn on key syncing below"}. It's never put in backup files.</p>
       <div class="field"><label for="tmdb-key">TMDB API key or read access token</label><input id="tmdb-key" class="input" type="password" autocomplete="off" value="${esc(Catalog.key())}"></div>
       <div class="field"><label for="tmdb-relay">Catalog relay address (for networks that block TMDB)</label><input id="tmdb-relay" class="input" inputmode="url" autocomplete="off" placeholder="https://reelnest-tmdb.yourname.workers.dev" value="${esc(Catalog.relay())}">
         <span class="tiny muted">Leave empty to connect directly. If Jio or your ISP blocks TMDB, deploy the free relay from the README and paste its address here. A relay that holds your key lets you leave the key field empty.</span></div>
+      ${Sync.active() ? `<label class="toggle-row" style="cursor:pointer"><div style="flex:1"><div style="font-weight:600">Sync my key to my account</div>
+        <div class="small muted">Off: the key stays on this device only. On: it's stored in your private ReelNest account (readable only when signed in as you) so your other devices get it. Turning it off removes the cloud copy; each device keeps its own key.</div></div>
+        <input type="checkbox" id="tmdb-sync" ${Sync.catalogMode() === "on" || (Sync.catalogMode() === "legacy" && (Catalog.key() || Catalog.relay())) ? "checked" : ""}></label>
+        ${Sync.catalogMode() === "legacy" && (Catalog.key() || Catalog.relay()) ? `<div class="banner" role="note">Your key is currently also stored in your account, set up by an earlier version. Untick and Save to remove it from the cloud, or Save as is to keep syncing it.</div>` : ""}` : ""}
       <div class="field"><label for="tmdb-lang">Title language</label><input id="tmdb-lang" class="input" value="${esc(s.lang)}" placeholder="en-US, hi-IN, ja-JP"><span class="tiny muted">Only picks which translation of titles to show. Search still covers every country and language.</span></div>
       <div><button class="btn primary" data-act="save-catalog">Save</button></div>
       <p class="tiny muted" style="margin:0">This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div></section>`;
@@ -1802,8 +1847,8 @@ function viewProfile() {
     <p style="margin:0">No followers, feeds, comments or public profiles. Ratings and notes stay private.</p>
     <div><b>On this device</b><br><span class="muted">Your library, watch history, ratings, notes, manual titles and preferences${IN_SANDBOX ? "" : ", plus your TMDB key and relay address (these never leave this browser except to TMDB or your relay)"}.</span></div>
     ${IN_SANDBOX ? `<div><b>Inside Claude</b><br><span class="muted">Your library is saved to your Claude account, private to you. This page contacts no other service.</span></div>` : `
-    <div><b>In the cloud, only if you sign in</b><br><span class="muted">Your email address and a copy of your library, history, ratings, notes, manual titles and preferences, stored in the Supabase project configured for this site. Not your TMDB key.</span></div>
-    <div><b>Other services this app contacts</b><br><span class="muted">TMDB (your searches, the titles you open, your API key) or your relay instead; poster images from TMDB's image servers, falling back to the public image proxy wsrv.nl when those are blocked (it sees which poster is requested); Google Fonts for the typeface. YouTube, IMDb and TMDB pages open only when you tap their links.</span></div>`}
+    <div><b>In the cloud, only if you sign in</b><br><span class="muted">Your email address and a copy of your library, history, ratings, notes, manual titles and preferences, stored in the Supabase project configured for this site. Your own TMDB key and relay address only if you turn on “Sync my key to my account” (currently ${Sync.catalogMode() === "on" || (Sync.catalogMode() === "legacy" && (Catalog.key() || Catalog.relay())) ? "on" : "off"}).</span></div>
+    <div><b>Other services this app contacts</b><br><span class="muted">${Catalog.shared() ? "This site's catalog relay (a Supabase function: it sees your searches, the titles you open and your IP address, which it uses only for rate limiting in a one-way-hashed form), or " : ""}TMDB directly (your searches, the titles you open, your own API key if you added one) or your own relay instead; poster images from TMDB's image servers, falling back to the public image proxy wsrv.nl when those are blocked (it sees which poster is requested); Google Fonts for the typeface. YouTube, IMDb and TMDB pages open only when you tap their links.</span></div>`}
   </div></section>
     <section class="section"><div class="section-head"><h2>Delete data</h2></div><div>
     <p class="small muted" style="margin:0 0 10px;max-width:65ch">Removes your whole library ${Persist.mode === "cloud" ? "from your Claude account for this page" : "from this browser"}. ${Sync.active() ? "Your cloud copy is separate: delete it from Backup &amp; sync if you want it gone too. " : ""}Export first if you want to keep anything.</p>
@@ -1985,17 +2030,27 @@ function viewDetail(id) {
   if (w.type === "SERIES") {
     const p = progressOf(eps, watched, t, incl);
     const missingAired = eps.filter((e) => !watched.has(e.id) && airState(e.airDate, t) === "aired" && (!isSpecial(e) || incl));
+    // Catalog seasons whose episode list isn't here yet: never show them as "0 of 0".
+    const unloaded = w.isManual ? [] : (S.seasons[id] || []).filter((m) => m.episodeCount > 0 && (m.number !== 0 || incl) && !eps.some((e) => e.season === m.number));
+    const ls = EpLoad[id], noData = !w.isManual && (!eps.length || unloaded.length);
+    const loadMsg = !noData ? "" : Catalog.status() !== "ready" ? "Episode data is unavailable until the catalog is connected on this device."
+      : ls && ls.error ? (ls.error === "offline" || !navigator.onLine ? "You're offline. Episode data will load when you're back online." : "Couldn't load episode data. " + Catalog.message(ls.error))
+      : ls === "done" ? "The catalog doesn't list episodes for this yet." : "Loading episode data…";
+    const loadNote = noData ? `<div class="small ${ls && ls.error ? "" : "muted"}" role="status" aria-live="polite" data-ep-load="${ls && ls.error ? "error" : Catalog.status() !== "ready" ? "unavailable" : ls === "done" ? "empty" : "loading"}">${esc(loadMsg)}
+        ${watched.size ? ` Your ${watched.size} watched episode${watched.size === 1 ? " is" : "s are"} saved and will be counted once it loads.` : ""}
+        ${(ls === "done" || (ls && ls.error)) && Catalog.status() === "ready" ? ` <button class="link-btn" data-act="eps-retry" data-id="${esc(id)}">Retry</button>` : ""}</div>` : "";
     h += `<div class="card panel"><div class="section-head"><h3 style="flex:1">Progress</h3><button class="link-btn" data-act="rules">How it's counted</button></div>
-      ${progressBar(p.fraction, `${p.watched} of ${p.total} aired episodes watched`)}
-      <div style="display:flex;flex-wrap:wrap;gap:8px 18px" class="small"><span class="num"><b>${p.watched}</b> of <b>${p.total}</b> aired watched</span>
+      ${!eps.length && noData ? loadNote : `${progressBar(p.fraction, `${p.watched} of ${p.total} aired episodes watched`)}
+      ${loadNote}
+      <div style="display:flex;flex-wrap:wrap;gap:8px 18px" class="small"><span class="num"><b>${p.watched}</b> of <b>${p.total}</b> aired watched${unloaded.length ? " so far" : ""}</span>
         ${p.upcoming ? `<span class="muted num">${p.upcoming} upcoming</span>` : ""}${p.unknown ? `<span class="muted num">${p.unknown} undated</span>` : ""}
-        ${p.specialsTotal ? `<span class="muted num">specials ${p.specialsWatched}/${p.specialsTotal}</span>` : ""}</div>
+        ${p.specialsTotal ? `<span class="muted num">specials ${p.specialsWatched}/${p.specialsTotal}</span>` : ""}</div>`}
       ${st && st.status === "COMPLETED" && missingAired.length ? `<div class="banner"><div style="display:grid;gap:8px"><b>Marked completed, with ${missingAired.length} aired episodes not marked watched.</b>
         <span>Setting a status never adds episode watches by itself.</span><div><button class="btn" data-act="complete-aired" data-id="${esc(id)}">Mark ${missingAired.length} aired episodes watched…</button></div></div></div>` : ""}
     </div>`;
     const seasonNums = [...new Set([...(S.seasons[id] || []).map((s) => s.number), ...eps.map((e) => e.season)])].sort((a, b) => (a === 0) - (b === 0) || a - b);
     h += `<div style="display:grid;gap:10px"><div class="section-head"><h2 style="flex:1;font-size:21px">Seasons</h2>${w.isManual ? `<button class="btn" data-act="add-eps" data-id="${esc(id)}">${I.plus} Add episodes</button>` : ""}</div>`;
-    if (!seasonNums.length) h += `<div class="banner">${w.isManual ? "No episodes yet. Add seasons and episodes to track them." : "No season information from the catalog yet."}</div>`;
+    if (!seasonNums.length) h += `<div class="banner">${w.isManual ? "No episodes yet. Add seasons and episodes to track them." : ls === "loading" || (!ls && Catalog.status() === "ready") ? "Loading seasons…" : ls === "done" ? "The catalog has no season information for this yet." : "Season information is unavailable right now."}</div>`;
     // Open the first season with an aired unwatched episode; otherwise the first with anything unwatched; otherwise the first.
     const firstOpen = seasonNums.find((n) => eps.some((e) => e.season === n && !watched.has(e.id) && airState(e.airDate, t) === "aired" && !isSpecial(e)))
       ?? seasonNums.find((n) => n !== 0 && eps.some((e) => e.season === n && !watched.has(e.id))) ?? seasonNums[0];
@@ -2013,7 +2068,7 @@ function viewDetail(id) {
         h += `<div class="season-body"><div style="display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap">
           <button class="chip" data-act="season-mark" data-id="${esc(id)}" data-n="${n}">Mark season watched…</button>
           ${done ? `<button class="chip" data-act="season-unmark" data-id="${esc(id)}" data-n="${n}">Mark season unwatched…</button>` : ""}</div>`;
-        if (!se.length) h += `<div class="small muted" style="padding:0 16px 14px">${w.isManual ? "No episodes in this season yet." : Catalog.status() === "ready" ? "Loading episodes…" : "Episode list unavailable here."}</div>`;
+        if (!se.length) h += `<div class="small muted" style="padding:0 16px 14px">${w.isManual ? "No episodes in this season yet." : Catalog.status() === "ready" ? ls === "done" ? `The catalog doesn't list episodes for this season yet. <button class="link-btn" data-act="eps-retry" data-id="${esc(id)}">Retry</button>` : ls && ls.error ? `Couldn't load this season. <button class="link-btn" data-act="eps-retry" data-id="${esc(id)}">Retry</button>` : "Loading episodes…" : "Episode list unavailable until the catalog is connected."}</div>`;
         h += se.map((e) => epRow(w, e, watched.has(e.id), t)).join("");
         h += `</div>`;
       }
@@ -2081,7 +2136,7 @@ function watchSection(w) {
     const d = cur.data;
     const groups = group("Subscription", d.stream) + group("Free", d.free) + group("Rent", d.rent) + group("Buy", d.buy);
     body = groups || `<p class="small" style="margin:0">No providers found for ${esc(regName)} in JustWatch's data. That doesn't mean it can't be watched there.</p>`;
-    if (d.link) body += `<div><a class="btn" href="${esc(d.link)}" target="_blank" rel="noopener">See offers and links on TMDB</a></div>`;
+    if (safeUrl(d.link, ["themoviedb.org"])) body += `<div><a class="btn" href="${esc(safeUrl(d.link, ["themoviedb.org"]))}" target="_blank" rel="noopener">See offers and links on TMDB</a></div>`;
   } else if (cur && !cur.data) {
     body = `<p class="small" style="margin:0">No providers found for ${esc(regName)} in JustWatch's data. That doesn't mean it can't be watched there.</p>`;
   } else if (st.loading || !st.error) {
@@ -2307,7 +2362,7 @@ function detailsCard(w) {
   add(`Certification (${countryName(region())})`, certFor(x) || (Object.keys(x.certs || {}).length ? "Not listed for this country" : null));
   if (x.budget) add("Budget", "$" + x.budget.toLocaleString("en-US"));
   if (x.revenue) add("Box office", "$" + x.revenue.toLocaleString("en-US"));
-  const links = [x.trailer ? `<a class="btn" href="${esc(x.trailer)}" target="_blank" rel="noopener">▶ Watch trailer</a>` : "", x.imdb ? `<a class="btn ghost" href="https://www.imdb.com/title/${esc(x.imdb)}/" target="_blank" rel="noopener">IMDb page</a>` : ""].join("");
+  const links = [safeUrl(x.trailer, ["youtube.com"]) ? `<a class="btn" href="${esc(safeUrl(x.trailer, ["youtube.com"]))}" target="_blank" rel="noopener">▶ Watch trailer</a>` : "", x.imdb ? `<a class="btn ghost" href="https://www.imdb.com/title/${esc(x.imdb)}/" target="_blank" rel="noopener">IMDb page</a>` : ""].join("");
   if (!rows.length && !links) return "";
   return `<div class="card panel"><h3>Details</h3>
     ${rows.length ? `<dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}
@@ -2483,13 +2538,25 @@ function exportJson() {
     settings: { theme: S.settings.theme.toUpperCase(), catalogLanguage: S.settings.lang, includeSpecials: String(S.settings.includeSpecials), hideSpoilers: String(S.settings.hideSpoilers) },
   }, null, 2);
 }
+const BACKUP_LIMITS = { bytes: 20 * 1024 * 1024, works: 20000, events: 300000, episodes: 400000, text: 10000 };
 function parseBackup(text) {
   let o;
+  if (typeof text !== "string" || text.length > BACKUP_LIMITS.bytes) return { errors: ["That file is too large to be a ReelNest backup (20 MB maximum)."] };
   try { o = JSON.parse(text); } catch { return { errors: ["This isn't a valid JSON file."] }; }
   if (!o || o.format !== "reelnest-export") return { errors: ["This isn't a ReelNest backup file."] };
   if (typeof o.version !== "number") return { errors: ["The file has no format version."] };
   if (o.version > 1) return { errors: [`This file is from a newer ReelNest (format ${o.version}). Update first.`] };
   const errors = [], arr = (k) => (Array.isArray(o[k]) ? o[k] : []);
+  for (const k of ["works", "seasons", "episodes", "states", "events", "tombstones"]) {
+    if (o[k] != null && !Array.isArray(o[k])) return { errors: [`“${k}” should be a list.`] };
+    if (arr(k).some((x) => !x || typeof x !== "object" || Array.isArray(x))) return { errors: [`“${k}” contains an entry that isn't a record.`] };
+  }
+  if (arr("works").length > BACKUP_LIMITS.works || arr("events").length > BACKUP_LIMITS.events || arr("episodes").length > BACKUP_LIMITS.episodes)
+    return { errors: ["This backup has more records than ReelNest supports in one import."] };
+  const long = (v, n) => v != null && (typeof v !== "string" || v.length > n);
+  if (arr("works").some((w) => long(w.id, 200) || long(w.title, 500) || long(w.overview, BACKUP_LIMITS.text)) || arr("states").some((x) => long(x.notes, BACKUP_LIMITS.text))
+      || arr("events").some((e) => long(e.id, 200) || long(e.episodeId, 200)))
+    return { errors: ["Some text in this backup is too long or has the wrong type."] };
   const ids = new Set();
   arr("works").forEach((w, i) => {
     if (!w.id || !w.title) errors.push(`Title #${i + 1} is missing its id or name.`);
@@ -2671,19 +2738,33 @@ function go(tab) {
   render(); window.scrollTo(0, 0);
   if (tab === "discover" && Catalog.status() === "ready" && (discIsHome() || (!UI.disc.items.length && !UI.disc.loading))) discoverReload(false);
 }
+/** Episode-metadata load state per series: "loading" | "done" | {error: code}. Absent = not tried yet. Watch records are never touched by loading. */
+const EpLoad = {};
+async function loadSeriesData(id, force) {
+  const w = S.works[id];
+  if (!w || w.isManual || w.type !== "SERIES" || Catalog.status() !== "ready" || EpLoad[id] === "loading") return;
+  EpLoad[id] = "loading"; if (UI.detail === id) render();
+  let err = null;
+  try {
+    if (force || !(S.seasons[id] || []).length || !w.extra || legacyCast(w)) {
+      try { await openCatalogItem({ key: id, type: w.type, providerId: w.providerId }); } catch (e) { if (!(S.seasons[id] || []).length) err = e; }
+    }
+    if (!err) err = await ensureEpisodes(id, force);
+  } catch (e) { err = e; }
+  EpLoad[id] = err ? { error: (err && err.code) || "network" } : "done";
+  if (UI.detail === id) render();
+  return err;
+}
 async function openDetail(id) {
   UI.detail = id; UI.menu = null; render(); window.scrollTo(0, 0);
   const w = S.works[id];
   loadWatch(id, false);
+  if (w && !w.isManual && w.type === "SERIES") { await loadSeriesData(id, false); return; }
   if (w && !w.isManual && (!w.extra || legacyCast(w)) && w.providerId && Catalog.status() === "ready") {
     try { await openCatalogItem({ key: id, type: w.type, providerId: w.providerId }); if (UI.detail === id) render(); } catch {}
   }
-  if (w && !w.isManual && w.type === "SERIES" && Catalog.status() === "ready") {
-    const err = await ensureEpisodes(id);
-    if (err) toast(Catalog.message(err.code));
-    if (UI.detail === id) render();
-  }
 }
+window.addEventListener("online", () => { const id = UI.detail; if (id && EpLoad[id] && EpLoad[id].error) loadSeriesData(id, false); });
 
 // ======================================================================
 //  Actions
@@ -2821,6 +2902,7 @@ const act = {
     const u = removeFromLibrary(d.id); UI.menu = null; toast("Removed from library", () => { u(); render(); });
   }, true),
   "toggle-anime": (d) => { const w = S.works[d.id]; w.isAnime = !w.isAnime; w.updatedAt = now(); Persist.touch(d.id); UI.menu = null; render(); },
+  "eps-retry": (d) => { if (EpLoad[d.id] && EpLoad[d.id].error) delete EpLoad[d.id]; loadSeriesData(d.id, true); },
   refresh: async (d) => { UI.menu = null; const w = S.works[d.id]; w.fetchedAt = 0; render(); try { await openCatalogItem({ key: d.id, type: w.type, providerId: w.providerId }); const e = await ensureEpisodes(d.id, true); toast(e ? Catalog.message(e.code) : "Updated from TMDB"); } catch (e) { toast(Catalog.message(e.code)); } render(); },
   "watch-refresh": (d) => loadWatch(d.id, true),
   "cast-scroll": (d) => { const row = document.getElementById(d.row); if (row) row.scrollBy({ left: +d.dir * row.clientWidth * 0.8, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); },
@@ -2914,7 +2996,12 @@ const act = {
     const changed = k !== (storage.get("reelnest.tmdbKey") || "") || r !== (storage.get("reelnest.tmdbRelay") || "");
     if (k) storage.set("reelnest.tmdbKey", k); else storage.del("reelnest.tmdbKey");
     if (r) storage.set("reelnest.tmdbRelay", r); else storage.del("reelnest.tmdbRelay");
-    if (changed) storage.set("reelnest.tmdbAt", String(now()));
+    const sy = document.getElementById("tmdb-sync");
+    // No toggle shown (signed out): a newly entered key defaults to this-device-only.
+    const mode = sy ? (sy.checked ? "on" : "off") : (changed && Sync.catalogMode() === "legacy" ? "off" : Sync.catalogMode());
+    const modeChanged = mode !== "legacy" && mode !== storage.get("reelnest.tmdbSync");
+    if (mode !== "legacy") storage.set("reelnest.tmdbSync", mode);
+    if (changed || modeChanged) storage.set("reelnest.tmdbAt", String(now()));
     Catalog.forgetHost();
     S.settings.lang = l; S.settingsAt = now(); Persist.touchMeta(); UI.disc.items = []; UI.disc.genres = []; render(); toast("Catalog settings saved");
   },
@@ -3064,7 +3151,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
   if (TABS.some((t) => t[0] === h)) UI.tab = h;
   render();
   Persist.init().then(async () => {
-    if ((storage.get("reelnest.tmdbKey") || storage.get("reelnest.tmdbRelay")) && !storage.get("reelnest.tmdbAt")) { storage.set("reelnest.tmdbAt", String(now())); Sync.markMeta(); }
+    if ((storage.get("reelnest.tmdbKey") || storage.get("reelnest.tmdbRelay")) && !storage.get("reelnest.tmdbAt") && Sync.catalogMode() === "on") { storage.set("reelnest.tmdbAt", String(now())); Sync.markMeta(); }
     if (CloudCfg.configured()) { await Sync.consumeRedirect(); if (Sync.active()) Sync.run(); render(); }
   });
   if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false);
@@ -3072,7 +3159,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 })();
 
 // Exposed for automated tests only.
-window.__reelnest = { Sync, createManual, markEpisodes, ensureState, setField, S, UI, addWatch, editWatch, parseDateInput, evDate, progressOf, upNextOf, planThrough, planSeason, mergeState, parseBackup, planImport, exportJson, epOrder, airState };
+window.__reelnest = { Sync, removeFromLibrary, Persist, EpLoad, createManual, markEpisodes, ensureState, setField, S, UI, addWatch, editWatch, parseDateInput, evDate, progressOf, upNextOf, planThrough, planSeason, mergeState, parseBackup, planImport, exportJson, epOrder, airState };
 </script>
 </body>
 </html>

@@ -12,8 +12,8 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
     # Phone: an old-version install that already has a key (no timestamp), already has some data
     phone, pp, e1 = new_page(b, 375, 812, mobile=True, cloud=True)
-    pp.evaluate("() => { localStorage.setItem('reelnest.tmdbKey', 'phone-tmdb-key-123'); localStorage.removeItem('reelnest.tmdbAt'); }"); pp.reload(); pp.wait_for_timeout(500)
-    check("existing key gets a timestamp so it can be shared", pp.evaluate("!!localStorage.getItem('reelnest.tmdbAt')"))
+    pp.evaluate("() => { localStorage.setItem('reelnest.tmdbKey', 'phone-tmdb-key-123'); localStorage.removeItem('reelnest.tmdbAt'); localStorage.setItem('reelnest.tmdbSync', 'on'); }"); pp.reload(); pp.wait_for_timeout(500)
+    check("an opted-in existing key gets a timestamp so it can be shared", pp.evaluate("!!localStorage.getItem('reelnest.tmdbAt')"))
     go_discover(pp); open_tile(pp, "3 Idiots"); pp.locator("[data-act=movie-watch]").click(); pp.wait_for_timeout(300); pp.locator("[data-act=watch-save]").click(); pp.wait_for_timeout(300)
     sign_in(pp)
     pp.evaluate("__reelnest.Sync.run()"); pp.wait_for_timeout(2000)
@@ -39,7 +39,7 @@ with sync_playwright() as p:
     go_discover(lp)
     check("laptop Discover works with the synced key", lp.locator(".dtile").count() > 0)
     lp.evaluate("location.hash='#profile'"); lp.wait_for_timeout(300)
-    check("profile explains the key syncs to your account", "synced privately to your signed-in account" in lp.locator("main").inner_text())
+    check("profile explains the key syncs to your account (opted in)", "because key syncing is on" in lp.locator("main").inner_text() and lp.is_checked("#tmdb-sync"))
     # Change the key on the laptop -> phone gets the new one
     lp.locator("#tmdb-key").fill("new-key-from-laptop"); lp.locator("[data-act=save-catalog]").click(); lp.wait_for_timeout(300)
     lp.evaluate("__reelnest.Sync.run()"); lp.wait_for_timeout(1500)

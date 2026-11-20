@@ -40,6 +40,9 @@ def supabase(route):
         uid = auth.split("tok:", 1)[1]; fn = u.path.rsplit("/", 1)[1]
         pre = f"set role authenticated; select set_config('request.jwt.claim.sub', '{uid}', false);"
         if fn == "rn_pull": return route.fulfill(status=200, content_type="application/json", headers={"Access-Control-Allow-Origin": "*"}, body=psql(pre + f" select rn_pull({int(body['since'])});").splitlines()[-1])
+        if fn == "rn_pull_since":
+            c = body.get("cursor"); arg = "null" if c is None else "'" + str(c).replace("'", "") + "'"
+            return route.fulfill(status=200, content_type="application/json", headers={"Access-Control-Allow-Origin": "*"}, body=psql(pre + f" select rn_pull_since({arg});").splitlines()[-1])
         if fn == "rn_push": psql(pre + " select rn_push($rnj$" + json.dumps(body["payload"]) + "$rnj$::jsonb);"); return okr(1)
     return okr({"msg": "not found"}, 404)
 

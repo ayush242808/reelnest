@@ -11,6 +11,11 @@ A private web app for tracking movies, TV series and anime from India and around
 | `sw.js`, `manifest.webmanifest`, `icon*.png`, `icon.svg` | Offline support and home-screen install |
 | `supabase/schema.sql` | Cloud backup database: tables, per-account security rules, merge functions |
 | `supabase/migrations-2026-11-watch-source.sql` | Upgrade for databases created before watch dates and sources were added (already applied to this site's project) |
+| `supabase/migrations-2026-11-20-security.sql` (+ `.rollback.sql`) | Least-privilege grants, fixed `search_path`, commit-safe sync cursor, clock clamp, relay rate-limit table (applied 2026-11-20) |
+| `supabase/migrations-2026-11-20-hotfix-push.sql` | Fix: a missing deletion time stays "not deleted" (applied 2026-11-20) |
+| `supabase/migrations-2026-11-20b-sync-convergence.sql` | Rejected edits flow back to the device that lost; clamp to server time (applied 2026-11-20). Rollback = re-run the hotfix file |
+| `supabase/functions/tmdb/index.ts` | Shared TMDB relay (Edge Function) |
+| `tools/csp.py` | Regenerates the Content-Security-Policy tag after any change to the app's script |
 | `relay-worker.js` | Optional Cloudflare relay for networks that block TMDB (deploy to Cloudflare, not GitHub Pages) |
 
 ## Hosting (GitHub Pages, free)
@@ -43,7 +48,7 @@ Availability comes from TMDB's watch-provider data, which is supplied by JustWat
 
 Without an account, everything stays in the browser. Clearing site data, private browsing, or switching browsers loses it unless you export a backup file. With cloud backup, you sign in with your email and a one-time code (Google sign-in is optional).
 
-**What syncs:** titles (including manual ones), episode progress and watch history, ratings, notes and preferences. Your TMDB key never syncs.
+**What syncs:** titles (including manual ones), episode progress and watch history, ratings, notes and preferences. Your own TMDB key syncs only if you turn on **Profile › Catalog › Sync my key to my account** (off by default). Turning it off removes the cloud copy; each device keeps its own key.
 
 **How it stays safe:**
 - Every edit is saved on the device first and queued for upload.
@@ -78,17 +83,36 @@ The anon key is meant to be public. Data is protected on the server by Row Level
 
 | Where | What's there |
 |---|---|
-| **On the device** | The whole library, plus the TMDB key and relay address |
-| **In the cloud** (only if signed in) | Your email address and a copy of the library and preferences |
-| **Other services** | TMDB (searches, opened titles, your key) or your relay; poster image hosts, including wsrv.nl as a fallback proxy; Google Fonts. YouTube, IMDb and TMDB pages open only when you tap their links. |
+| **On the device** | The whole library, plus your own TMDB key and relay address if you added them, and your sign-in session |
+| **In the cloud** (only if signed in) | Your email address and a copy of the library and preferences. Your own TMDB key and relay address only if you opted in to key syncing |
+| **Backup files** | Library, history and preferences. Never the TMDB key, relay address or sign-in session |
+| **Other services** | The shared relay (this project's Supabase function: searches, opened titles, and your IP address, kept only as a one-way hash for rate limiting) or TMDB directly (searches, opened titles, your own key) or your own relay; poster image hosts, including wsrv.nl as a fallback proxy; Google Fonts. YouTube, IMDb and TMDB pages open only when you tap their links. |
 
 ## Backup files
 
-Profile › Export backup produces a versioned JSON file (`reelnest-export` v1). Import validates the file and previews the changes, then merges without overwriting. This works with or without an account.
+Profile › Export backup produces a versioned JSON file (`reelnest-export` v1). Import validates the file (20 MB and record-count limits, record shapes, field types and lengths) and previews the changes, then merges without overwriting. This works with or without an account.
 
 ## Tests
 
-`webtest/e2e.py` runs the real app in headless Chrome. TMDB is simulated with fixtures, and the Supabase server is the real `schema.sql` on a local PostgreSQL. `webtest/sql/tests.sql` tests the database rules directly.
+`webtest/e2e.py` runs the real app in headless Chrome. TMDB is simulated with fixtures, and the Supabase server is the real `schema.sql` on a local PostgreSQL. `webtest/sql/tests.sql` tests the database rules directly. Also:
+
+- `webtest/migtest.py`: replays the production schema, then the migrations, and checks grants, isolation, the sync cursor race, clamping, NULL deletions and convergence (needs a schema-only dump at `/tmp/prod_schema.sql`).
+- `webtest/scenarios.py`: TMDB-key opt-in and removal, episode loading/failure/retry/offline, and sync scenarios (equal timestamps, clock skew, concurrent edits, retries, delete vs. edit, fresh-device restore, backups).
+- `webtest/csp_check.py`: the CSP blocks injected scripts and handlers, image fallback, backup limits, unsafe links.
+- `webtest/relay/relay_test.mjs`: relay allowlists, limits, timeouts (`node --experimental-strip-types`).
+
+## Security notes
+
+- **Content-Security-Policy** is a `<meta>` tag, because GitHub Pages can't send custom headers. After editing the script in `index.html`, run `python3 tools/csp.py` (CI-style check: `--check`). GitHub Pages also can't send `frame-ancestors`, HSTS or `X-Content-Type-Options`, so clickjacking protection isn't possible on this host.
+- **Database roles:** `anon` has no table access. `authenticated` has select/insert/update/delete only, limited to its own rows by RLS. No TRUNCATE, TRIGGER or REFERENCES for either role, and default privileges for new tables were narrowed too.
+- **Sync** uses a transaction-id cursor, so changes committed out of order are never skipped. Client timestamps can't be later than the server clock. A device whose edit lost a conflict pulls the winning value back.
+
+## Monitoring the shared relay
+
+- Logs: Supabase › Edge Functions › `tmdb` › Logs. Look for `relay_limit` (a client or the daily budget hit its limit), `relay_upstream` (TMDB errors or timeouts) and `relay_limiter_unavailable` (the database counter couldn't be reached, so the per-instance fallback applied).
+- Usage: run this in the SQL editor:
+  `select case when bucket like '%:global' then bucket else 'per-client' end as bucket, window_start, sum(hits) as hits from rn_private.relay_hits where window_start > now() - interval '1 day' group by 1, 2 order by 2 desc;`
+- Limits per client: 300 API calls and 900 images per 5 minutes. Site-wide: 25,000 API calls and 40,000 images per day. Change `LIMITS` in `index.ts` and redeploy.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB. Availability data comes from JustWatch. ReelNest doesn't stream or download anything.
 
