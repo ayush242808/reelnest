@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-9NE+0wiSh2aRtE8fDObD1xGoVCWEiuljc8YQ+7sx/T4=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-uyi+jrDdU/qHY/goLPeEL5qRQ+Xt4Z3HuRIDz03qJD4=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -189,6 +189,8 @@ textarea.input { min-height: 96px; resize: vertical; }
 @media (min-width: 720px) { .next-grid { grid-template-columns: 1fr 1fr; } }
 .next-card { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px; }
 .next-card .title { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.2; }
+.season-pct { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.season-pct b { font-size: 15px; color: var(--accent); }
 .next-card .ep { font-weight: 600; margin-top: 2px; }
 /* "Mark watched" is an action: an empty ring, not the filled circle used for episodes already watched. */
 .watch-btn {
@@ -483,7 +485,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=22"></script>
+<script src="config.js?v=23"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -523,7 +525,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 22; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 23; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -577,6 +579,17 @@ function progressOf(eps, watched, t, includeSpecials) {
 }
 
 /** First unwatched episode after the furthest watched one. */
+/** Continue watching: how far through the season of the next episode (aired episodes only), plus the whole show. */
+function seasonProgress(x, n, p) {
+  const t = today(), sn = n.ep.season;
+  const aired = x.eps.filter((e) => e.season === sn && airState(e.airDate, t) === "aired");
+  const done = aired.filter((e) => x.watched.has(e.id)).length;
+  const pct = aired.length ? Math.floor((done / aired.length) * 100) : 0;
+  const name = sn === 0 ? "Specials" : `Season ${sn}`;
+  return `<div class="season-pct"><b class="num">${pct}%</b> of ${name} <span class="muted num">· ${done}/${aired.length}</span></div>
+    ${progressBar(aired.length ? done / aired.length : 0, `${name}: ${done} of ${aired.length} aired episodes watched, ${pct}%`)}
+    <div class="tiny muted num">Whole show: ${p.watched}/${p.total} aired · ${p.missing} left</div>`;
+}
 function upNextOf(eps, watched, t, includeSpecials) {
   const ordered = eps.filter((e) => !isSpecial(e) || includeSpecials).sort(epOrder);
   if (!ordered.length) return { kind: "none" };
@@ -1543,8 +1556,7 @@ function viewHome() {
           <button class="link-btn" style="padding:0;text-align:left;color:inherit" data-act="open" data-id="${esc(x.w.id)}"><span class="title">${esc(x.w.title)}</span></button>
           <div class="ep">${esc(epCode(n.ep))}${n.ep.title ? ` · ${esc(n.ep.title)}` : ""}</div>
           <div class="small muted">Aired ${esc(fmtDate(n.ep.airDate))}</div>
-          ${progressBar(p.fraction, `${p.watched} of ${p.total} aired episodes watched`)}
-          <div class="tiny muted num">${p.watched}/${p.total} aired · ${p.missing} left</div>
+          ${seasonProgress(x, n, p)}
         </div>
         <button class="watch-btn" data-act="watch-next" data-id="${esc(x.w.id)}" data-ep="${esc(n.ep.id)}" aria-label="Mark ${esc(epCode(n.ep))} of ${esc(x.w.title)} watched"><span class="ring" aria-hidden="true">${I.check}</span><span aria-hidden="true">Mark watched</span></button>
       </article>`).join("") + `</div>`;
