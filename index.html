@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-1RE1xW1VUFKC5lFfWzLNNj0J/jYc3Fo4w/Ao/0uRP+k=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-f7jg34iVvyd6Wjbt/NxtdEybVkjgdAXFNOnhKnx7Rvo=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -190,14 +190,19 @@ textarea.input { min-height: 96px; resize: vertical; }
 .next-card { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px; }
 .next-card .title { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.2; }
 .next-card .ep { font-weight: 600; margin-top: 2px; }
+/* "Mark watched" is an action: an empty ring, not the filled circle used for episodes already watched. */
 .watch-btn {
-  width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
-  background: var(--accent); color: var(--accent-ink); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent);
-  transition: transform .12s;
+  display: grid; justify-items: center; gap: 4px; padding: 2px; border: 0; background: none; color: var(--ink-muted);
+  font: 600 11px/1.1 inherit; text-align: center; width: 64px;
 }
-.watch-btn:hover { transform: scale(1.05); }
-.watch-btn:active { transform: scale(.95); }
-.watch-btn svg { width: 28px; height: 28px; }
+.watch-btn .ring {
+  width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px dashed color-mix(in srgb, var(--ink-muted) 70%, transparent); color: color-mix(in srgb, var(--ink-muted) 80%, transparent);
+  background: var(--surface); transition: transform .12s, border-color .12s, color .12s, background .12s;
+}
+.watch-btn:hover .ring, .watch-btn:focus-visible .ring { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.watch-btn:active .ring { transform: scale(.94); background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.watch-btn svg { width: 24px; height: 24px; }
 .row-list { display: grid; }
 .row { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 10px 6px; border-radius: 14px; border: 0; background: none; text-align: left; width: 100%; }
 .row:hover { background: var(--surface-2); }
@@ -471,7 +476,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=20"></script>
+<script src="config.js?v=21"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -511,7 +516,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 20; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 21; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -1249,7 +1254,7 @@ const Sync = {
     const h = location.hash.slice(1);
     if (h.includes("error_code=") || h.includes("error=")) {
       const e = new URLSearchParams(h);
-      history.replaceState(null, "", location.pathname + "#profile");
+      Nav.reset("profile");
       UI.tab = "profile";
       const expired = e.get("error_code") === "otp_expired";
       Object.assign(this.auth, { step: "email", busy: false, msgErr: true,
@@ -1258,7 +1263,7 @@ const Sync = {
     }
     if (!h.includes("access_token=")) return false;
     const p = new URLSearchParams(h);
-    history.replaceState(null, "", location.pathname + "#profile");
+    Nav.reset("profile");
     UI.tab = "profile";
     this.session = { access_token: p.get("access_token"), refresh_token: p.get("refresh_token"), expires_at: now() + (+p.get("expires_in") || 3600) * 1000, user: null };
     try {
@@ -1532,7 +1537,7 @@ function viewHome() {
           ${progressBar(p.fraction, `${p.watched} of ${p.total} aired episodes watched`)}
           <div class="tiny muted num">${p.watched}/${p.total} aired · ${p.missing} left</div>
         </div>
-        <button class="watch-btn" data-act="watch-next" data-id="${esc(x.w.id)}" data-ep="${esc(n.ep.id)}" aria-label="Mark ${esc(epCode(n.ep))} of ${esc(x.w.title)} watched">${I.check}</button>
+        <button class="watch-btn" data-act="watch-next" data-id="${esc(x.w.id)}" data-ep="${esc(n.ep.id)}" aria-label="Mark ${esc(epCode(n.ep))} of ${esc(x.w.title)} watched"><span class="ring" aria-hidden="true">${I.check}</span><span aria-hidden="true">Mark watched</span></button>
       </article>`).join("") + `</div>`;
   } else {
     h += `<div class="banner">${needs.length ? "Some shows have no episode list yet. Open one to add episodes." : "Nothing ready to watch. Shows you're watching appear here with their next aired episode."}</div>`;
@@ -1587,8 +1592,10 @@ function viewDiscover() {
     `<button class="btn primary" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
   const heading = d.q ? "" : d.seeTitle || (!active ? (d.type === "movie" ? "Trending movies this week" : d.type === "tv" ? "Trending series this week" : "Trending this week") : "");
   h += `${heading ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">${esc(heading)}</h2></div>` : `<h2 class="sr">Results</h2>`}<div class="dgrid">`;
-  h += d.items.map(discTile).join("");
+  const shown = d.q ? d.items : unwatched(d.items), hidden = d.items.length - shown.length;
+  h += shown.map(discTile).join("");
   h += `</div>`;
+  if (hidden) h += `<p class="tiny muted" style="margin:8px 0 0">${hidden} title${hidden > 1 ? "s" : ""} you've already watched ${hidden > 1 ? "are" : "is"} hidden. Search to find ${hidden > 1 ? "them" : "it"}.</p>`;
   if (d.page < d.pages) h += `<div style="display:flex;justify-content:center;margin:16px 0"><button class="btn" data-act="disc-more" ${d.loading ? "disabled" : ""}>${d.loading ? "Loading…" : "Load more"}</button></div>`;
   h += `<div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-act="manual" data-title="${esc(d.q)}">Can't find it? Add it manually</button>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
@@ -1647,15 +1654,23 @@ async function discoverHome(force) {
   if (DISC_ROWS.every((r) => got[r.k])) storage.set("reelnest.discCache", JSON.stringify({ v: 2, key: discCacheKey(), at: d.rowsAt, rows: d.rows }));
   render();
 }
+/** Finished titles: marked Completed, or a movie with a watch record. Hidden from Discover rows and lists, not from search. */
+function watchedAlready(key) {
+  const st = S.states[key], w = S.works[key];
+  if (!st || !w) return false;
+  if (st.status === "COMPLETED") return true;
+  return w.type === "MOVIE" && Object.values(S.events).some((e) => e.workId === key && e.deletedAt == null);
+}
+const unwatched = (items) => items.filter((it) => !watchedAlready(it.key));
 function discHomeRows() {
   const d = UI.disc, any = DISC_ROWS.some((r) => (d.rows[r.k] || []).length);
   if (!any && d.rowsLoading) return skeleton();
   if (!any && !d.rowsError) return emptyBlock("Nothing to show yet", "Search above for any movie, series or anime.", `<button class="btn" data-act="disc-refresh">Try again</button>`);
   if (!any && d.rowsError) return emptyBlock(d.rowsError === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.rowsError),
     `<button class="btn primary" data-act="disc-refresh">Try again</button><button class="btn" data-act="manual">Add manually</button>`);
-  let h = DISC_ROWS.filter((r) => (d.rows[r.k] || []).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
+  let h = DISC_ROWS.filter((r) => unwatched(d.rows[r.k] || []).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
       <div class="section-head"><h2 id="row-${r.k}" style="font-size:19px;flex:1">${r.title}</h2><button class="link-btn" data-act="disc-see" data-k="${r.k}">See all</button></div>
-      <div class="drow" role="list">${d.rows[r.k].map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`).join("");
+      <div class="drow" role="list">${unwatched(d.rows[r.k]).map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`).join("");
   h += `<div style="display:grid;gap:8px;margin-top:8px"><button class="btn" data-act="manual">Can't find it? Add it manually</button>
     <p class="tiny muted" style="margin:0">${d.rowsLoading ? "Updating…" : d.rowsAt ? `Updated ${esc(relTime(d.rowsAt))}. ` : ""}${!d.rowsLoading ? `<button class="link-btn" data-act="disc-refresh">Refresh now</button>` : ""}</p>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
@@ -2759,9 +2774,44 @@ function render() {
     if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} }
   }
 }
-function go(tab) {
+/** Back button: Home is the bottom history entry, any other tab sits one entry above it, and each opened title adds one
+ *  more. So Back goes title -> tab -> Home -> leaves the app. Modals aren't history entries; Back closes an open one. */
+const Nav = {
+  pending: null, skip: false,
+  st() { const s = history.state; return s && s.rn ? s : null; },
+  lvl() { const s = this.st(); return s ? s.lvl : 0; },
+  saveScroll() { const s = this.st(); if (s) history.replaceState({ ...s, y: window.scrollY }, ""); },
+  reset(tab) {
+    history.replaceState({ rn: 1, lvl: 0, tab: "home" }, "", location.pathname + location.search + "#home");
+    if (tab && tab !== "home") history.pushState({ rn: 1, lvl: 1, tab }, "", "#" + tab);
+  },
+  tab(tab) {
+    const L = this.lvl();
+    if (!this.st()) return this.reset(tab);
+    if (tab === "home") { if (L > 0) { this.pending = () => {}; history.go(-L); } return; }
+    if (L === 0) { this.saveScroll(); history.pushState({ rn: 1, lvl: 1, tab }, "", "#" + tab); }
+    else if (L === 1) history.replaceState({ rn: 1, lvl: 1, tab }, "", "#" + tab);
+    else { this.pending = () => history.replaceState({ rn: 1, lvl: 1, tab }, "", "#" + tab); history.go(-(L - 1)); }
+  },
+  detail(id) {
+    if (!this.st()) this.reset(UI.tab);
+    this.saveScroll();
+    history.pushState({ rn: 1, lvl: this.lvl() + 1, tab: UI.tab, detail: id }, "", "#" + UI.tab);
+  },
+};
+window.addEventListener("popstate", (ev) => {
+  if (Nav.skip) { Nav.skip = false; return; }
+  if (Nav.pending) { const f = Nav.pending; Nav.pending = null; f(); return; } // the screen was already switched by go()
+  if (UI.modal) { UI.modal = null; render(); Nav.skip = true; history.go(1); return; } // Back closes the dialog only
+  const s = ev.state && ev.state.rn ? ev.state : { lvl: 0, tab: "home" };
+  UI.menu = null;
+  if (s.detail) { UI.tab = s.tab; if (UI.detail !== s.detail) openDetail(s.detail, true); }
+  else { if (UI.tab !== s.tab || UI.detail) go(s.tab, true); }
+  requestAnimationFrame(() => window.scrollTo(0, s.y || 0));
+});
+function go(tab, fromHistory) {
+  if (!fromHistory) Nav.tab(tab);
   UI.tab = tab; UI.detail = null; UI.menu = null;
-  if (location.hash !== "#" + tab) history.replaceState(null, "", "#" + tab);
   render(); window.scrollTo(0, 0);
   if (tab === "discover" && Catalog.status() === "ready" && (discIsHome() || (!UI.disc.items.length && !UI.disc.loading))) discoverReload(false);
 }
@@ -2782,7 +2832,8 @@ async function loadSeriesData(id, force) {
   if (UI.detail === id) render();
   return err;
 }
-async function openDetail(id) {
+async function openDetail(id, fromHistory) {
+  if (!fromHistory) Nav.detail(id);
   UI.detail = id; UI.menu = null; render(); window.scrollTo(0, 0);
   const w = S.works[id];
   loadWatch(id, false);
@@ -2798,7 +2849,7 @@ window.addEventListener("online", () => { const id = UI.detail; if (id && EpLoad
 // ======================================================================
 const act = {
   tab: (d) => go(d.id),
-  back: () => { UI.detail = null; UI.menu = null; render(); },
+  back: () => { if (Nav.st() && Nav.st().detail) { history.back(); return; } UI.detail = null; UI.menu = null; render(); },
   open: (d) => openDetail(d.id),
   "remove-demo": () => confirmDlg("Remove demo titles?", `<p style="margin:0">Deletes the made-up demo titles added by an earlier version, with their watch records. Your own titles are not touched.</p>`, "Remove demo titles", () => {
     for (const w of Object.values(S.works).filter((w) => w.demo)) { removeInternal(w.id); dropWork(w.id); Persist.touch(w.id); }
@@ -3171,14 +3222,19 @@ document.addEventListener("pointermove", (ev) => {
   });
 }, { passive: true });
 document.addEventListener("pointerout", (ev) => { if (tiltEl && !tiltEl.contains(ev.relatedTarget)) { cancelAnimationFrame(tiltRaf); untilt(tiltEl); tiltEl = null; } });
-window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (TABS.some((t) => t[0] === h) && (h !== UI.tab || UI.detail)) go(h); });
+// Only for a hash typed or linked by hand; Back/Forward between ReelNest's own entries are handled by popstate.
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (!Nav.st() && TABS.some((t) => t[0] === h)) { Nav.reset(h); go(h, true); } });
 
 // ---------- boot ----------
 (function boot() {
   const h = location.hash.slice(1);
   if (TABS.some((t) => t[0] === h)) UI.tab = h;
+  const resumed = Nav.st(); // a reload, or coming back with Forward: keep the history stack as it is
+  if (resumed && TABS.some((t) => t[0] === resumed.tab)) UI.tab = resumed.tab;
+  else if (!h || TABS.some((t) => t[0] === h)) Nav.reset(UI.tab); // sign-in redirects (#access_token=...) are handled below
   render();
   Persist.init().then(async () => {
+    if (resumed && resumed.detail && S.works[resumed.detail]) openDetail(resumed.detail, true);
     if ((storage.get("reelnest.tmdbKey") || storage.get("reelnest.tmdbRelay")) && !storage.get("reelnest.tmdbAt") && Sync.catalogMode() === "on") { storage.set("reelnest.tmdbAt", String(now())); Sync.markMeta(); }
     if (CloudCfg.configured()) { await Sync.consumeRedirect(); if (Sync.active()) Sync.run(); render(); }
   });
