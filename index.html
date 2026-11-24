@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Y+bY3wSrKDjQhRZdJb7rseeWYU8faFLFp6FyfiMkqtk=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-1RE1xW1VUFKC5lFfWzLNNj0J/jYc3Fo4w/Ao/0uRP+k=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -471,7 +471,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=19"></script>
+<script src="config.js?v=20"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -511,6 +511,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
+const APP_VERSION = 20; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -1858,7 +1859,8 @@ function viewProfile() {
         ${Sync.catalogMode() === "legacy" && (Catalog.key() || Catalog.relay()) ? `<div class="banner" role="note">Your key is currently also stored in your account, set up by an earlier version. Untick and Save to remove it from the cloud, or Save as is to keep syncing it.</div>` : ""}` : ""}
       <div class="field"><label for="tmdb-lang">Title language</label><input id="tmdb-lang" class="input" value="${esc(s.lang)}" placeholder="en-US, hi-IN, ja-JP"><span class="tiny muted">Only picks which translation of titles to show. Search still covers every country and language.</span></div>
       <div><button class="btn primary" data-act="save-catalog">Save</button></div>
-      <p class="tiny muted" style="margin:0">This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div></section>`;
+      <p class="tiny muted" style="margin:0">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+      <p class="tiny muted" style="margin:0" data-app-version>ReelNest version ${APP_VERSION}</p></div></section>`;
   }
 
   h += `<section class="section"><div class="section-head"><h2>Privacy</h2></div><div class="card panel small" style="gap:10px">
@@ -2487,6 +2489,13 @@ function renderModal() {
 function confirmDlg(title, body, ok, onOk, danger) { openModal({ type: "confirm", title, body, ok, onOk, danger }); }
 
 let toastTimer = null;
+function offerReload() {
+  offerReload.shown = true;
+  const bar = document.createElement("div");
+  bar.className = "toast fade-in"; bar.setAttribute("role", "status"); bar.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:60";
+  bar.innerHTML = `<span>A new version of ReelNest is ready.</span><button data-act="app-reload">Reload</button>`;
+  document.body.appendChild(bar);
+}
 function toast(msg, undo) {
   const root = document.getElementById("toast-root");
   clearTimeout(toastTimer);
@@ -2920,6 +2929,7 @@ const act = {
     const u = removeFromLibrary(d.id); UI.menu = null; toast("Removed from library", () => { u(); render(); });
   }, true),
   "toggle-anime": (d) => { const w = S.works[d.id]; w.isAnime = !w.isAnime; w.updatedAt = now(); Persist.touch(d.id); UI.menu = null; render(); },
+  "app-reload": () => location.reload(),
   "eps-retry": (d) => { if (EpLoad[d.id] && EpLoad[d.id].error) delete EpLoad[d.id]; loadSeriesData(d.id, true); },
   refresh: async (d) => { UI.menu = null; const w = S.works[d.id]; w.fetchedAt = 0; render(); try { await openCatalogItem({ key: d.id, type: w.type, providerId: w.providerId }); const e = await ensureEpisodes(d.id, true); toast(e ? Catalog.message(e.code) : "Updated from TMDB"); } catch (e) { toast(Catalog.message(e.code)); } render(); },
   "watch-refresh": (d) => loadWatch(d.id, true),
@@ -3173,7 +3183,19 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
     if (CloudCfg.configured()) { await Sync.consumeRedirect(); if (Sync.active()) Sync.run(); render(); }
   });
   if (UI.tab === "discover" && Catalog.status() === "ready") discoverReload(false);
-  if (!IN_SANDBOX && "serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if (!IN_SANDBOX && "serviceWorker" in navigator && location.protocol === "https:") {
+    // An app left open (installed app, background tab) keeps running old code. Check for a new version whenever it comes
+    // back to the screen, and offer a reload once the new version has taken over.
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || offerReload.shown) return;
+      if (document.visibilityState === "hidden") { location.reload(); return; } // nothing on screen to lose
+      offerReload();
+    });
+  }
 })();
 
 // Exposed for automated tests only.

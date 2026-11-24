@@ -1,5 +1,5 @@
 // ReelNest offline cache: the app shell works offline; TMDB requests always go to the network.
-const CACHE = "reelnest-v19";
+const CACHE = "reelnest-v20";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(
