@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-f7jg34iVvyd6Wjbt/NxtdEybVkjgdAXFNOnhKnx7Rvo=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-9NE+0wiSh2aRtE8fDObD1xGoVCWEiuljc8YQ+7sx/T4=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -376,6 +376,13 @@ details summary { cursor: pointer; font-weight: 600; }
 .dtile-wl[disabled] { opacity: .7; cursor: progress; }
 .dtile-badge { position: absolute; z-index: 3; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px;
   border-radius: 999px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; background: rgba(14, 13, 12, .62); color: #fff; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.verdict { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.verdict i { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--vc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--vc) 25%, transparent); }
+.verdict b { font-weight: 700; color: var(--ink-muted); }
+.v-perfection { --vc: #a855f7; } .v-go { --vc: #22c55e; } .v-timepass { --vc: #eab308; } .v-skip { --vc: #ef4444; }
+.dtile-meta .verdict { margin-top: 2px; }
+.ratings-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.ratings-line a.score { color: inherit; text-decoration: none; }
 .dtile-badge.on { background: var(--accent); color: var(--accent-ink); }
 .dtile-badge svg { width: 12px; height: 12px; }
 .dtile-busy { position: absolute; z-index: 4; inset: 0 0 auto 0; aspect-ratio: 2/3; display: grid; place-items: center; border-radius: 16px;
@@ -476,7 +483,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=21"></script>
+<script src="config.js?v=22"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -516,7 +523,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 21; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 22; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -651,7 +658,7 @@ const UI = {
   tab: "home", detail: null, openSeasons: {}, menu: null, modal: null, loading: true, loadNote: null, saveError: null,
   lib: { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null, sort: "updated" },
   disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null,
-    seeAll: false, rows: { movies: [], series: [], india: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null },
+    seeAll: false, rows: { movies: [], series: [], india: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null, timepass: false },
   reveal: {},
 };
 const DEVICE = (() => { const k = "reelnest.device"; let d = storage.get(k); if (!d) { d = "web-" + uuid().slice(0, 8); storage.set(k, d); } return d; })();
@@ -1005,7 +1012,8 @@ const Catalog = {
     const d = this.date(type === "MOVIE" ? r.release_date : r.first_air_date);
     return { key: `tmdb:${type.toLowerCase()}:${r.id}`, type, providerId: String(r.id), title, originalTitle: orig && orig !== title ? orig : null,
       year: d ? Number(d.slice(0, 4)) : null, posterPath: r.poster_path, lang: r.original_language, countries: r.origin_country || [],
-      genreIds: r.genre_ids || [], anime: (r.genre_ids || []).includes(16) && r.original_language === "ja" };
+      genreIds: r.genre_ids || [], anime: (r.genre_ids || []).includes(16) && r.original_language === "ja",
+      tv: r.vote_count ? Math.round(r.vote_average * 10) / 10 : null, tvotes: r.vote_count || 0 };
   },
   async details(item) {
     const id = item.key, lang = S.settings.lang;
@@ -1210,11 +1218,12 @@ const Sync = {
     this._refreshing = locked().finally(() => { this._refreshing = null; });
     return this._refreshing;
   },
-  async rpc(name, args) {
+  async rpc(name, args) { return this.post(`/rest/v1/rpc/${name}`, args); },
+  async post(path, args) {
     this.adoptStoredSession();
     if (this.session && this.session.expires_at && this.session.expires_at < now() + 60e3) await this.refresh();
-    try { return await this.http(`/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(args) }); }
-    catch (e) { if (e.code !== "auth") throw e; await this.refresh(); return this.http(`/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(args) }); }
+    try { return await this.http(path, { method: "POST", body: JSON.stringify(args) }); }
+    catch (e) { if (e.code !== "auth") throw e; await this.refresh(); return this.http(path, { method: "POST", body: JSON.stringify(args) }); }
   },
   setSession(r) {
     const user = r.user ? { id: r.user.id, email: r.user.email } : this.session && this.session.user;
@@ -1592,7 +1601,9 @@ function viewDiscover() {
     `<button class="btn primary" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
   const heading = d.q ? "" : d.seeTitle || (!active ? (d.type === "movie" ? "Trending movies this week" : d.type === "tv" ? "Trending series this week" : "Trending this week") : "");
   h += `${heading ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">${esc(heading)}</h2></div>` : `<h2 class="sr">Results</h2>`}<div class="dgrid">`;
-  const shown = d.q ? d.items : unwatched(d.items), hidden = d.items.length - shown.length;
+  Ratings.queue(d.items.map((it) => it.key));
+  const ranked = d.seeAll && d.seeAll !== "anime" && !d.q;
+  const pool = d.q ? d.items : unwatched(d.items), shown = ranked ? rankByVerdict(pool) : pool, hidden = d.items.length - pool.length;
   h += shown.map(discTile).join("");
   h += `</div>`;
   if (hidden) h += `<p class="tiny muted" style="margin:8px 0 0">${hidden} title${hidden > 1 ? "s" : ""} you've already watched ${hidden > 1 ? "are" : "is"} hidden. Search to find ${hidden > 1 ? "them" : "it"}.</p>`;
@@ -1634,7 +1645,7 @@ const DISC_TTL = 864e5; // refresh at most once a day
 const discIsHome = () => { const d = UI.disc; return !d.q.trim() && d.type === "all" && !d.seeAll && ![d.year, d.lang, d.country, d.genre].some(Boolean); };
 const discCacheKey = () => `${S.settings.lang}|${region()}`;
 function discCacheRead() {
-  try { const c = JSON.parse(storage.get("reelnest.discCache") || "null"); return c && c.v === 2 && c.key === discCacheKey() ? c : null; } catch { return null; }
+  try { const c = JSON.parse(storage.get("reelnest.discCache") || "null"); return c && c.v === 3 && c.key === discCacheKey() ? c : null; } catch { return null; }
 }
 function discFind(key) { const d = UI.disc; return d.items.find((i) => i.key === key) || Object.values(d.rows).flat().find((i) => i.key === key); }
 async function discoverHome(force) {
@@ -1644,15 +1655,84 @@ async function discoverHome(force) {
   if (!force && fresh) { render(); return; }
   if (d.rowsLoading) return;
   d.rowsLoading = true; d.rowsError = null; render();
-  const res = await Promise.allSettled(DISC_ROWS.map((r) => rowFetch(r, 1).then((x) => x.items.slice(0, 20))));
+  const res = await Promise.allSettled(DISC_ROWS.map((r) => rowFetch(r, 1).then((x) => x.items.slice(0, 40))));
   d.rowsLoading = false;
   const got = {};
   res.forEach((r, i) => { if (r.status === "fulfilled" && r.value.length) got[DISC_ROWS[i].k] = r.value; });
   if (!Object.keys(got).length && res.some((r) => r.status === "rejected")) { d.rowsError = (res.find((r) => r.reason).reason.code) || "network"; render(); return; }
   d.rows = { ...d.rows, ...got }; d.rowsAt = now();
   // Save only a complete set, so a partial answer is retried next time instead of being kept for a day.
-  if (DISC_ROWS.every((r) => got[r.k])) storage.set("reelnest.discCache", JSON.stringify({ v: 2, key: discCacheKey(), at: d.rowsAt, rows: d.rows }));
+  if (DISC_ROWS.every((r) => got[r.k])) storage.set("reelnest.discCache", JSON.stringify({ v: 3, key: discCacheKey(), at: d.rowsAt, rows: d.rows }));
   render();
+}
+/** Public audience ratings. IMDb votes come from ReelNest's own Supabase function (IMDb's official dataset, refreshed daily)
+ *  and only for signed-in users; TMDB votes come with every catalog item. Cached here for 3 days. */
+const Ratings = {
+  KEY: "reelnest.ratings", TTL: 3 * 864e5, mem: null, inflight: new Set(),
+  load() { if (!this.mem) { try { this.mem = JSON.parse(storage.get(this.KEY) || "{}") || {}; } catch { this.mem = {}; } } return this.mem; },
+  save() {
+    const m = this.mem, ks = Object.keys(m);
+    if (ks.length > 3000) ks.sort((a, b) => m[a].at - m[b].at).slice(0, ks.length - 2500).forEach((k) => delete m[k]);
+    storage.set(this.KEY, JSON.stringify(m));
+  },
+  available() { return CloudCfg.configured() && Sync.signedIn(); },
+  of(key) { const e = this.load()[key]; return e && e.at > now() - this.TTL ? e.i : undefined; }, // undefined = not known yet, null = no IMDb rating
+  queue(keys) {
+    if (!this.available()) return;
+    clearTimeout(this._t); (this._q = this._q || new Set()); keys.forEach((k) => this._q.add(k));
+    this._t = setTimeout(() => { const ks = [...this._q]; this._q.clear(); this.ensure(ks).then((ch) => { if (ch) render(); }); }, 50);
+  },
+  async ensure(keys) {
+    const m = this.load(), t = now();
+    this.tried = this.tried || new Map();
+    const need = [...new Set(keys)].filter((k) => /^tmdb:(movie|series):\d+$/.test(k) && !this.inflight.has(k) && this.of(k) === undefined && !((this.tried.get(k) || 0) > t - 60e3));
+    if (!need.length) return false;
+    need.forEach((k) => { this.inflight.add(k); this.tried.set(k, t); });
+    let changed = false;
+    try {
+      for (let i = 0; i < need.length; i += 60) {
+        const r = await Sync.post("/functions/v1/ratings", { keys: need.slice(i, i + 60) });
+        for (const [k, v] of Object.entries((r && r.ratings) || {})) { m[k] = { i: v && typeof v.r === "number" ? { r: v.r, v: v.v, id: v.id } : null, at: t }; changed = true; }
+      }
+    } catch {} // offline / signed out / function busy: verdicts fall back to TMDB alone
+    finally { need.forEach((k) => this.inflight.delete(k)); }
+    if (changed) this.save();
+    return changed;
+  },
+};
+/** Moctale-style verdict from public audience votes. Each source is pulled towards an average film (6.4) until it has
+ *  enough votes, so 40 people rating 9.6 can't beat 500,000 rating 8.7. IMDb counts three times as much as TMDB. */
+const VERDICTS = [["perfection", "Perfection", 8.0], ["go", "Go for It", 7.0], ["timepass", "Time Pass", 6.0], ["skip", "Skip", 0]];
+function verdictOf(it) {
+  const im = Ratings.available() ? Ratings.of(it.key) : null;
+  if (im === undefined) return null; // still loading
+  const bay = (R, v, m) => (v * R + m * 6.4) / (v + m), parts = [];
+  if (im && im.v) parts.push([bay(im.r, im.v, 2500), 3]);
+  if (it.tv != null && it.tvotes) parts.push([bay(it.tv, it.tvotes, 250), 1]);
+  if (!parts.length) return null;
+  const score = Math.round(parts.reduce((a, p) => a + p[0] * p[1], 0) / parts.reduce((a, p) => a + p[1], 0) * 10) / 10;
+  const [band, label] = VERDICTS.find((v) => score >= v[2]);
+  return { score, band, label, imdb: im || null };
+}
+const verdictChip = (v) => v ? `<span class="verdict v-${v.band}"><i aria-hidden="true"></i>${v.label} <b class="num">${v.score.toFixed(1)}</b></span>` : "";
+/** Best first: only Go for It and Perfection (plus Time Pass if chosen); titles still being rated wait at the end. */
+function rankByVerdict(items) {
+  const keep = UI.disc.timepass ? ["perfection", "go", "timepass"] : ["perfection", "go"];
+  const scored = items.map((it) => [it, verdictOf(it)]);
+  return [...scored.filter(([, v]) => v && keep.includes(v.band)).sort((a, b) => b[1].score - a[1].score), ...scored.filter(([, v]) => !v)].map(([it]) => it);
+}
+function detailRatings(w, x) {
+  if (w.isManual || !/^tmdb:/.test(w.id)) return "";
+  Ratings.queue([w.id]);
+  const v = verdictOf({ key: w.id, tv: x.score, tvotes: x.votes }), im = v && v.imdb;
+  const imdbUrl = im && /^tt\d+$/.test(im.id) ? safeUrl(`https://www.imdb.com/title/${im.id}/`, ["imdb.com"]) : "";
+  const moctale = safeUrl(`https://www.google.com/search?q=${encodeURIComponent(`site:moctale.in ${w.title} ${w.year || ""}`.trim())}`, ["google.com"]);
+  return `<div class="ratings-line">
+      ${im ? `<a class="score" href="${esc(imdbUrl)}" target="_blank" rel="noopener" aria-label="IMDb rating ${im.r} out of 10 from ${im.v} votes"><b class="num">IMDb ${im.r.toFixed(1)}</b><span class="muted small num">${im.v.toLocaleString()} votes</span></a>`
+        : Ratings.available() && Ratings.of(w.id) === undefined ? `<span class="small muted">Loading IMDb rating…</span>` : ""}
+      ${verdictChip(v)}
+      ${moctale ? `<a class="link-btn small" href="${esc(moctale)}" target="_blank" rel="noopener">See it on Moctale</a>` : ""}
+    </div>`;
 }
 /** Finished titles: marked Completed, or a movie with a watch record. Hidden from Discover rows and lists, not from search. */
 function watchedAlready(key) {
@@ -1668,11 +1748,17 @@ function discHomeRows() {
   if (!any && !d.rowsError) return emptyBlock("Nothing to show yet", "Search above for any movie, series or anime.", `<button class="btn" data-act="disc-refresh">Try again</button>`);
   if (!any && d.rowsError) return emptyBlock(d.rowsError === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.rowsError),
     `<button class="btn primary" data-act="disc-refresh">Try again</button><button class="btn" data-act="manual">Add manually</button>`);
-  let h = DISC_ROWS.filter((r) => unwatched(d.rows[r.k] || []).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
+  Ratings.queue(DISC_ROWS.flatMap((r) => d.rows[r.k] || []).map((it) => it.key));
+  const rowItems = (r) => { const xs = unwatched(d.rows[r.k] || []); return (r.k === "anime" ? xs : rankByVerdict(xs)).slice(0, 20); };
+  let h = `<div class="chips" style="margin:2px 0 6px" role="group" aria-label="Verdicts shown"><span class="small muted" style="align-self:center">Showing</span>
+      <span class="verdict v-perfection"><i aria-hidden="true"></i>Perfection</span><span class="verdict v-go"><i aria-hidden="true"></i>Go for It</span>
+      <button class="chip" data-act="disc-timepass" aria-pressed="${!!d.timepass}">${d.timepass ? "✓ Time Pass" : "+ Time Pass"}</button></div>`;
+  h += DISC_ROWS.filter((r) => rowItems(r).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
       <div class="section-head"><h2 id="row-${r.k}" style="font-size:19px;flex:1">${r.title}</h2><button class="link-btn" data-act="disc-see" data-k="${r.k}">See all</button></div>
-      <div class="drow" role="list">${unwatched(d.rows[r.k]).map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`).join("");
+      <div class="drow" role="list">${rowItems(r).map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`).join("");
   h += `<div style="display:grid;gap:8px;margin-top:8px"><button class="btn" data-act="manual">Can't find it? Add it manually</button>
     <p class="tiny muted" style="margin:0">${d.rowsLoading ? "Updating…" : d.rowsAt ? `Updated ${esc(relTime(d.rowsAt))}. ` : ""}${!d.rowsLoading ? `<button class="link-btn" data-act="disc-refresh">Refresh now</button>` : ""}</p>
+    <p class="tiny muted" style="margin:0">Verdicts combine IMDb and TMDB audience votes; anime keeps TMDB's popularity order. Ratings information courtesy of IMDb (https://www.imdb.com), used with permission for personal non-commercial use.</p>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
   return h;
 }
@@ -1687,7 +1773,7 @@ function discTile(it) {
       ${poster({ id: it.key, title: it.title, type: it.type, year: it.year, posterPath: it.posterPath, isAnime: it.anime })}
       <span class="dtile-meta"><span class="t">${esc(it.title)}</span>
         <span class="sub">${it.year ? `<span class="num">${it.year}</span><span aria-hidden="true">·</span>` : ""}<b>${kind}</b></span>
-        ${where.length ? `<span class="lang">${esc(where.join(" · "))}</span>` : ""}</span>
+        ${where.length ? `<span class="lang">${esc(where.join(" · "))}</span>` : ""}${verdictChip(verdictOf(it))}</span>
     </button>
     ${onWl ? `<span class="dtile-badge on" aria-hidden="true">${I.bookmark.replace('stroke-width="2"', 'stroke-width="2.4"')}Watchlist</span>` : inLib ? `<span class="dtile-badge" aria-hidden="true">${I.check}In library</span>` : ""}
     <button class="dtile-wl" data-act="disc-watchlist" data-key="${esc(it.key)}" aria-pressed="${onWl}" ${busy ? "disabled" : ""}
@@ -2048,6 +2134,7 @@ function viewDetail(id) {
       ${w.originalTitle && w.originalTitle !== w.title ? `<div class="muted" style="font-weight:600">${esc(w.originalTitle)}</div>` : ""}
       ${x.tagline ? `<div class="tagline">“${esc(x.tagline)}”</div>` : ""}
       ${x.score ? `<div class="score" aria-label="TMDB user score ${x.score} out of 10 from ${x.votes} votes"><b class="num">★ ${x.score.toFixed(1)}</b><span class="muted small num">TMDB · ${x.votes.toLocaleString()} votes</span></div>` : ""}
+      ${detailRatings(w, x)}
       <div class="meta-line">
         <span class="pill accent">${kindLabel(w)}</span>
         ${w.isManual ? `<span class="pill ${w.demo ? "demo" : ""}">${w.demo ? "Demo title" : "Manual entry"}</span>` : ""}
@@ -3032,6 +3119,7 @@ const act = {
   "lib-clear": () => { Object.assign(UI.lib, { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null }); UI.modal = null; render(); },
   "lib-grid": () => { S.settings.grid = !S.settings.grid; S.settingsAt = now(); Persist.touchMeta(); render(); },
   // discover
+  "disc-timepass": () => { UI.disc.timepass = !UI.disc.timepass; storage.set("reelnest.discTimepass", UI.disc.timepass ? "1" : ""); render(); },
   "disc-type": (d) => { Object.assign(UI.disc, { type: d.v, seeTitle: null, seeAll: false }); discoverReload(false); },
   "disc-clear": () => { Object.assign(UI.disc, { q: "", type: "all", year: "", lang: "", country: "", genre: null, seeAll: false, seeTitle: null, items: [] }); discoverReload(false); window.scrollTo(0, 0); },
   "disc-refresh": () => discoverHome(true),
@@ -3227,6 +3315,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 
 // ---------- boot ----------
 (function boot() {
+  UI.disc.timepass = storage.get("reelnest.discTimepass") === "1";
   const h = location.hash.slice(1);
   if (TABS.some((t) => t[0] === h)) UI.tab = h;
   const resumed = Nav.st(); // a reload, or coming back with Forward: keep the history stack as it is

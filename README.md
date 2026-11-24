@@ -15,6 +15,8 @@ A private web app for tracking movies, TV series and anime from India and around
 | `supabase/migrations-2026-11-20-hotfix-push.sql` | Fix: a missing deletion time stays "not deleted" (applied 2026-11-20) |
 | `supabase/migrations-2026-11-20b-sync-convergence.sql` | Rejected edits flow back to the device that lost; clamp to server time (applied 2026-11-20). Rollback = re-run the hotfix file |
 | `supabase/functions/tmdb/index.ts` | Shared TMDB relay (Edge Function) |
+| `supabase/migrations-2026-11-24-ratings.sql` (+ `.rollback.sql`) | Private IMDb ratings store, TMDB→IMDb id cache, daily sync job (applied 2026-11-24) |
+| `supabase/functions/ratings/index.ts` | Ratings function: IMDb audience ratings for signed-in users, plus the daily sync |
 | `tools/csp.py` | Regenerates the Content-Security-Policy tag after any change to the app's script |
 | `relay-worker.js` | Optional Cloudflare relay for networks that block TMDB (deploy to Cloudflare, not GitHub Pages) |
 
@@ -106,6 +108,19 @@ Profile › Export backup produces a versioned JSON file (`reelnest-export` v1).
 - **Content-Security-Policy** is a `<meta>` tag, because GitHub Pages can't send custom headers. After editing the script in `index.html`, run `python3 tools/csp.py` (CI-style check: `--check`). GitHub Pages also can't send `frame-ancestors`, HSTS or `X-Content-Type-Options`, so clickjacking protection isn't possible on this host.
 - **Database roles:** `anon` has no table access. `authenticated` has select/insert/update/delete only, limited to its own rows by RLS. No TRUNCATE, TRIGGER or REFERENCES for either role, and default privileges for new tables were narrowed too.
 - **Sync** uses a transaction-id cursor, so changes committed out of order are never skipped. Client timestamps can't be later than the server clock. A device whose edit lost a conflict pulls the winning value back.
+
+## Discover verdicts (public audience ratings)
+
+Discover rates titles like Moctale's meter (**Perfection**, **Go for It**, **Time Pass**, **Skip**). The score is calculated from public audience votes, not paid or critic reviews:
+
+- **IMDb:** official non-commercial dataset (`title.ratings.tsv.gz`), loaded nightly at 02:47 IST by `pg_cron` calling the `ratings` function. It's stored in `rn_private`, which no API role can read, and returned only to signed-in users, as IMDb's personal-use terms require.
+- **TMDB:** vote average and vote count.
+
+Each source is pulled towards an average film (6.4) until it has enough votes (IMDb 2,500, TMDB 250), so a handful of 10/10 votes can't top the list. IMDb is weighted 3:1 over TMDB. The bands are Perfection 8.0+, Go for It 7.0–7.9, Time Pass 6.0–6.9 and Skip below 6.0 (`VERDICTS` in `index.html`).
+
+The rows show Perfection and Go for It, best first; **+ Time Pass** adds the next band. Anime keeps TMDB's popularity order. When you're signed out, verdicts use TMDB votes alone. Moctale has no public API, so title pages only link to it.
+
+To check the sync, run `select * from rn_private.imdb_sync;` in the SQL editor, or open Logs and search for `ratings_sync`. To run it by hand, open `…/functions/v1/ratings?op=sync`; it runs at most once every 20 hours.
 
 ## Monitoring the shared relay
 

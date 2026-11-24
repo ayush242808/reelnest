@@ -52,7 +52,7 @@ with sync_playwright() as p:
 
     check("rows scroll sideways, page doesn't", pg.evaluate("(()=>{return [...document.querySelectorAll('.drow')].some(r => r.scrollWidth>r.clientWidth)})()") and no_sideways(pg))
     cache = pg.evaluate("JSON.parse(localStorage.getItem('reelnest.discCache'))")
-    check("a copy is saved for next time", cache and cache["v"] == 2 and len(cache["rows"]["anime"]) == 7)
+    check("a copy is saved for next time", cache and cache["v"] == 3 and len(cache["rows"]["anime"]) == 7)
     pg.screenshot(path="/home/claude/webtest/h-home-desktop.png")
     # Reload with the network down: rows appear instantly from the saved copy
     state["down"] = True; seen.clear()
