@@ -39,7 +39,7 @@ with sync_playwright() as p:
     pg.goto(APP); pg.evaluate("() => { localStorage.clear(); localStorage.setItem('reelnest.tmdbKey','k'); }"); pg.reload(); pg.wait_for_timeout(300)
     go_discover(pg, search=False); pg.wait_for_timeout(600)
     heads = pg.locator(".drow-sec h2").all_inner_texts()
-    check("home rows: best movies, best series, best Indian movies, anime (no Indian serials row)", heads == ["Best movies right now", "Best series right now", "Best Indian movies", "Popular anime"], heads)
+    check("home rows: best movies, best series, best Indian movies, anime (no Indian serials row)", heads == ["New releases", "Best movies right now", "Best series right now", "Best Indian movies", "Popular anime"], heads)
     ind = pg.locator(".drow-sec", has_text="Best Indian movies").locator(".dtile-meta .t").all_inner_texts()
     check("Indian row: recent popular ones first, then older top-rated, no poster-less entries", ind[:8] == [f"Desi Movie {i}" for i in range(8)] and ind[8:] == [f"Classic Movie {i}" for i in range(5)], ind)
     sq = [x for x in seen if "discover/tv" in x and "with_genres=16" not in x]
@@ -58,7 +58,8 @@ with sync_playwright() as p:
     state["down"] = True; seen.clear()
     pg.reload(); t0 = time.time(); pg.evaluate("location.hash='#discover'")
     pg.wait_for_selector(".drow .dtile", timeout=3000); dt = time.time() - t0
-    check("after reload, rows show instantly from the saved copy (no network needed)", pg.locator(".dtile").count() == 10 + 8 + 13 + 7 and dt < 1.5, dt)
+    newc = pg.locator(".drow-sec", has_text="New releases").locator(".dtile").count()
+    check("after reload, rows show instantly from the saved copy (no network needed)", newc > 0 and pg.locator(".dtile").count() == newc + 10 + 8 + 13 + 7 and dt < 1.5, (dt, newc, pg.locator(".dtile").count()))
     check("fresh copy: no catalog requests made", not [s for s in seen if "/3/" in s], seen[:3])
     check("shows when it was updated, with Refresh now", "Updated" in pg.locator("main").inner_text() and pg.locator("[data-act=disc-refresh]").count() == 1)
     # Older than a day: still shown instantly, refreshed in the background
@@ -74,7 +75,7 @@ with sync_playwright() as p:
     pg.locator("[data-act=disc-more]").click(); pg.wait_for_timeout(900)
     check("Load more on a See all page works (no duplicates)", pg.locator(".dgrid .dtile").count() == 13 and not errs, errs)
     pg.locator("[data-act=disc-clear]").click(); pg.wait_for_timeout(300)
-    check("Clear returns to the home rows", pg.locator(".drow-sec").count() == 4)
+    check("Clear returns to the home rows", pg.locator(".drow-sec").count() == 5)
     pg.locator("[data-act=disc-see][data-k=anime]").click(); pg.wait_for_timeout(900)
     check("See all anime -> anime grid with Back to Discover", pg.locator(".dgrid .dtile").count() == 7 and "Popular anime" in pg.locator("main").inner_text() and "Back to Discover" in pg.locator("[data-act=disc-clear]").inner_text())
     pg.locator("[data-act=disc-clear]").click(); pg.wait_for_timeout(300)
@@ -86,7 +87,7 @@ with sync_playwright() as p:
     pg.locator("#disc-q").fill("idiots"); pg.wait_for_timeout(1200)
     check("search shows a results grid", pg.locator(".dgrid .dtile").count() == 5 and pg.locator(".drow-sec").count() == 0)
     pg.locator("#disc-q").fill(""); pg.wait_for_timeout(800)
-    check("clearing search returns to rows", pg.locator(".drow-sec").count() == 4)
+    check("clearing search returns to rows", pg.locator(".drow-sec").count() == 5)
     check("no page errors", not errs, errs)
     ctx.close()
     # Remembered host: direct TMDB blocked -> after the first discovery, later loads skip it

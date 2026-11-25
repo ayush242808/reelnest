@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-EwQ3D6Bg4jb9AJgpgNcOcHsrPVYg3ZvuFkU1p/2GOqI=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-PAkNsjYW7a/fBPx7+84ex07e5dnOwvKquuW8L8sSJVs=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -490,7 +490,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=27"></script>
+<script src="config.js?v=28"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -530,7 +530,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 27; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 28; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -677,7 +677,7 @@ const UI = {
   tab: "home", detail: null, openSeasons: {}, menu: null, modal: null, loading: true, loadNote: null, saveError: null,
   lib: { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null, sort: "updated" },
   disc: { q: "", type: "all", year: "", lang: "", country: "", genre: null, items: [], page: 0, pages: 0, loading: false, error: null, filteredLocally: false, genres: [], opening: null,
-    seeAll: false, rows: { movies: [], series: [], india: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null, timepass: false },
+    seeAll: false, rows: { new: [], movies: [], series: [], india: [], anime: [] }, rowsAt: 0, rowsLoading: false, rowsError: null, timepass: false },
   reveal: {},
 };
 const DEVICE = (() => { const k = "reelnest.device"; let d = storage.get(k); if (!d) { d = "web-" + uuid().slice(0, 8); storage.set(k, d); } return d; })();
@@ -1626,7 +1626,7 @@ function viewDiscover() {
   if (d.q && d.didYouMean && !d.loading) h += `<p class="small" style="margin:4px 0 10px">Showing results for <b>${esc(d.didYouMean)}</b>.
       <button class="link-btn" data-act="disc-exact">Search only for “${esc(d.q.trim())}”</button></p>`;
   Ratings.queue(d.items.map((it) => it.key));
-  const ranked = d.seeAll && d.seeAll !== "anime" && !d.q;
+  const ranked = d.seeAll && (DISC_ROWS.find((r) => r.k === d.seeAll) || {}).rank !== false && !d.q;
   const pool = d.q ? d.items : unwatched(d.items), shown = ranked ? rankByVerdict(pool) : pool, hidden = d.items.length - pool.length;
   h += shown.map(discTile).join("");
   h += `</div>`;
@@ -1637,12 +1637,19 @@ function viewDiscover() {
   return h;
 }
 // ---------- Discover home: rows shown instantly from a saved copy, refreshed in the background once a day ----------
+const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return isoOf(d); };
 const monthsAgo = (n) => { const d = new Date(); d.setMonth(d.getMonth() - n); return isoOf(d); };
 // TV genres kept out of "best series": Kids, News, Reality, Soap (daily serials), Talk, and Animation (anime has its own row).
 const TV_SKIP = "16,10762,10763,10764,10766,10767";
 /** Each row: first recent, currently popular titles that are well rated; then gradually older titles with a higher bar.
  *  Quality comes from TMDB's audience rating with a minimum number of votes (IMDb/Letterboxd/Rotten Tomatoes aren't in the licensed catalog). */
 const DISC_ROWS = [
+  // New releases: first released in the last ~2 months, popular first. Movies, series and Indian movies are interleaved so
+  // the row isn't all Hollywood; not filtered by verdict, because brand-new titles have too few votes to judge yet.
+  { k: "new", title: "New releases", rank: false, mix: true, tiers: () => [
+    ["discover/movie", { sort_by: "popularity.desc", "primary_release_date.gte": daysAgo(60), "primary_release_date.lte": today(), "vote_count.gte": 10 }, "MOVIE"],
+    ["discover/tv", { sort_by: "popularity.desc", "first_air_date.gte": daysAgo(60), "first_air_date.lte": today(), without_genres: TV_SKIP, "vote_count.gte": 3 }, "SERIES"],
+    ["discover/movie", { with_origin_country: "IN", sort_by: "popularity.desc", "primary_release_date.gte": daysAgo(75), "primary_release_date.lte": today() }, "MOVIE"]] },
   { k: "movies", title: "Best movies right now", forced: "MOVIE", tiers: () => [
     ["discover/movie", { sort_by: "popularity.desc", "primary_release_date.gte": monthsAgo(12), "primary_release_date.lte": today(), "vote_average.gte": 7, "vote_count.gte": 150 }],
     ["discover/movie", { sort_by: "primary_release_date.desc", "primary_release_date.lte": monthsAgo(12), "vote_average.gte": 7.6, "vote_count.gte": 2000 }]] },
@@ -1652,7 +1659,7 @@ const DISC_ROWS = [
   { k: "india", title: "Best Indian movies", forced: "MOVIE", tiers: () => [
     ["discover/movie", { with_origin_country: "IN", sort_by: "popularity.desc", "primary_release_date.gte": monthsAgo(18), "primary_release_date.lte": today(), "vote_average.gte": 6.8, "vote_count.gte": 15 }],
     ["discover/movie", { with_origin_country: "IN", sort_by: "primary_release_date.desc", "primary_release_date.lte": monthsAgo(18), "vote_average.gte": 7.3, "vote_count.gte": 150 }]] },
-  { k: "anime", title: "Popular anime", forced: "SERIES", tiers: () => [
+  { k: "anime", title: "Popular anime", forced: "SERIES", rank: false, tiers: () => [
     ["discover/tv", { with_genres: 16, with_original_language: "ja", sort_by: "popularity.desc", "vote_count.gte": 20 }]] },
 ];
 /** One page of a row: recent-and-popular first, then the older top-rated ones, without repeats or poster-less entries. */
@@ -1661,8 +1668,11 @@ async function rowFetch(row, page) {
   const settled = await Promise.allSettled(row.tiers().map(([path, params]) => Catalog.call(path, { language: lang, include_adult: "false", page, ...params })));
   const res = settled.filter((x) => x.status === "fulfilled").map((x) => x.value);
   if (!res.length) throw settled[0].reason; // one tier running out of pages is fine; all failing is an error
-  const seen = new Set(), items = [];
-  for (const r of res) for (const x of r.results || []) { const it = Catalog.item(x, row.forced); if (it && it.posterPath && !seen.has(it.key)) { seen.add(it.key); items.push(it); } }
+  const tiers = row.tiers(), seen = new Set(), items = [];
+  const lists = settled.map((x, i) => x.status === "fulfilled" ? (x.value.results || []).map((y) => Catalog.item(y, tiers[i][2] || row.forced)) : []);
+  const take = (it) => { if (it && it.posterPath && !seen.has(it.key)) { seen.add(it.key); items.push(it); } };
+  if (row.mix) { for (let i = 0; lists.some((l) => i < l.length); i++) lists.forEach((l) => take(l[i])); } // round-robin
+  else lists.forEach((l) => l.forEach(take));
   return { items, pages: Math.max(...res.map((r) => r.total_pages || 1)) };
 }
 const DISC_TTL = 864e5; // refresh at most once a day
@@ -1773,16 +1783,19 @@ function discHomeRows() {
   if (!any && d.rowsError) return emptyBlock(d.rowsError === "offline" ? "You're offline" : "Couldn't reach the catalog", Catalog.message(d.rowsError),
     `<button class="btn primary" data-act="disc-refresh">Try again</button><button class="btn" data-act="manual">Add manually</button>`);
   Ratings.queue(DISC_ROWS.flatMap((r) => d.rows[r.k] || []).map((it) => it.key));
-  const rowItems = (r) => { const xs = unwatched(d.rows[r.k] || []); return (r.k === "anime" ? xs : rankByVerdict(xs)).slice(0, 20); };
-  let h = `<div class="chips" style="margin:2px 0 6px" role="group" aria-label="Verdicts shown"><span class="small muted" style="align-self:center">Showing</span>
+  const rowItems = (r) => { const xs = unwatched(d.rows[r.k] || []); return (r.rank === false ? xs : rankByVerdict(xs)).slice(0, 20); };
+  const rowHtml = (r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
+      <div class="section-head"><h2 id="row-${r.k}" style="font-size:19px;flex:1">${r.title}</h2><button class="link-btn" data-act="disc-see" data-k="${r.k}">See all</button></div>
+      <div class="drow" role="list">${rowItems(r).map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`;
+  const newRow = DISC_ROWS[0], rest = DISC_ROWS.slice(1);
+  let h = rowItems(newRow).length ? rowHtml(newRow) : "";
+  h += `<div class="chips" style="margin:2px 0 6px" role="group" aria-label="Verdicts shown"><span class="small muted" style="align-self:center">Showing</span>
       <span class="verdict v-perfection"><i aria-hidden="true"></i>Perfection</span><span class="verdict v-go"><i aria-hidden="true"></i>Go for It</span>
       <button class="chip" data-act="disc-timepass" aria-pressed="${!!d.timepass}">${d.timepass ? "✓ Time Pass" : "+ Time Pass"}</button></div>`;
-  h += DISC_ROWS.filter((r) => rowItems(r).length).map((r) => `<section class="drow-sec" aria-labelledby="row-${r.k}">
-      <div class="section-head"><h2 id="row-${r.k}" style="font-size:19px;flex:1">${r.title}</h2><button class="link-btn" data-act="disc-see" data-k="${r.k}">See all</button></div>
-      <div class="drow" role="list">${rowItems(r).map((it) => `<div role="listitem">${discTile(it)}</div>`).join("")}</div></section>`).join("");
+  h += rest.filter((r) => rowItems(r).length).map(rowHtml).join("");
   h += `<div style="display:grid;gap:8px;margin-top:8px"><button class="btn" data-act="manual">Can't find it? Add it manually</button>
     <p class="tiny muted" style="margin:0">${d.rowsLoading ? "Updating…" : d.rowsAt ? `Updated ${esc(relTime(d.rowsAt))}. ` : ""}${!d.rowsLoading ? `<button class="link-btn" data-act="disc-refresh">Refresh now</button>` : ""}</p>
-    <p class="tiny muted" style="margin:0">Verdicts combine IMDb and TMDB audience votes; anime keeps TMDB's popularity order. Ratings information courtesy of IMDb (https://www.imdb.com), used with permission for personal non-commercial use.</p>
+    <p class="tiny muted" style="margin:0">Verdicts combine IMDb and TMDB audience votes; new releases and anime keep TMDB's popularity order. Ratings information courtesy of IMDb (https://www.imdb.com), used with permission for personal non-commercial use.</p>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
   return h;
 }
