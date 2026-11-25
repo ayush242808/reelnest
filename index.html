@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-4R4CpSP3O73C5D+ribKAaCMx/zQwiG4KD7KejqAXduo=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-IXUGZ39VcqNK84qRtgHBbvyE1oW2dw+4ij3XcE6QdGI=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -490,7 +490,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=25"></script>
+<script src="config.js?v=26"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -530,7 +530,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 25; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 26; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -1837,6 +1837,7 @@ function titleSim(q, it) {
 const closeMatch = (q, items) => !fuzzKey(q) || items.some((it) => titleSim(q, it) >= 0.86);
 async function spellingsFor(q) {
   const out = [], add = (c) => { c = String(c || "").replace(/\s*\([^)]*\)\s*$/, "").trim(); if (c && fuzzKey(c) !== fuzzKey(q) && !out.some((o) => fuzzKey(o) === fuzzKey(c))) out.push(c); };
+  add(q.toLowerCase().replace(/([a-z])\1+/g, "$1")); // "kantaara" -> "kantara", "mirzaapur" -> "mirzapur"
   try { // Wikipedia's search corrects spelling ("did you mean"); only the typed words are sent
     const u = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srlimit=5&srinfo=suggestion&srprop=&format=json&origin=*`;
     const j = await fetch(u, { signal: AbortSignal.timeout(3500) }).then((r) => r.ok ? r.json() : null);
@@ -1861,7 +1862,7 @@ async function typoSearch(q, firstItems, search) {
   const seen = new Set(), scored = [];
   for (const { c, xs } of [{ c: null, xs: firstItems }, ...found])
     for (const it of xs) if (!seen.has(it.key)) { seen.add(it.key); scored.push({ it, c, sim: titleSim(q, it) }); }
-  const good = scored.filter((x) => x.sim >= 0.6).sort((a, b) => b.sim - a.sim);
+  const good = scored.filter((x) => x.sim >= 0.6).sort((a, b) => b.sim - a.sim || a.it.title.length - b.it.title.length);
   if (!good.length) return null;
   const used = good[0].c && fuzzKey(good[0].it.title) !== fuzzKey(q) ? good[0].it.title : null;
   return { items: [...good, ...scored.filter((x) => x.sim < 0.6 && x.c === null)].map((x) => x.it), used };
