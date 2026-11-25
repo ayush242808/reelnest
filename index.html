@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OszY1g9xZZTW/Zab7wFnEVv6NyTczjBEBLKkj/GzH7c=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-4R4CpSP3O73C5D+ribKAaCMx/zQwiG4KD7KejqAXduo=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -490,7 +490,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=24"></script>
+<script src="config.js?v=25"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -530,7 +530,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 24; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 25; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -1623,6 +1623,8 @@ function viewDiscover() {
     `<button class="btn primary" data-act="manual" data-title="${esc(d.q)}">Add manually</button>`);
   const heading = d.q ? "" : d.seeTitle || (!active ? (d.type === "movie" ? "Trending movies this week" : d.type === "tv" ? "Trending series this week" : "Trending this week") : "");
   h += `${heading ? `<div class="section-head" style="margin-top:12px"><h2 style="font-size:19px">${esc(heading)}</h2></div>` : `<h2 class="sr">Results</h2>`}<div class="dgrid">`;
+  if (d.q && d.didYouMean && !d.loading) h += `<p class="small" style="margin:4px 0 10px">Showing results for <b>${esc(d.didYouMean)}</b>.
+      <button class="link-btn" data-act="disc-exact">Search only for “${esc(d.q.trim())}”</button></p>`;
   Ratings.queue(d.items.map((it) => it.key));
   const ranked = d.seeAll && d.seeAll !== "anime" && !d.q;
   const pool = d.q ? d.items : unwatched(d.items), shown = ranked ? rankByVerdict(pool) : pool, hidden = d.items.length - pool.length;
@@ -1803,6 +1805,67 @@ function discTile(it) {
     ${busy ? `<span class="dtile-busy" role="status">Opening…</span>` : ""}
   </article>`;
 }
+/** Typo-tolerant search. Spelling is compared loosely, the way Indian titles get transliterated: case, accents,
+ *  punctuation, doubled letters, aa/a, ee/i, oo/u, ph/f, w/v, z/j, q/k, bh/b, dh/d, th/t, kh/k, gh/g all count as the same. */
+function fuzzKey(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, "")
+    .replace(/ph/g, "f").replace(/ck/g, "k").replace(/q/g, "k").replace(/w/g, "v").replace(/z/g, "j").replace(/ee/g, "i").replace(/oo/g, "u")
+    .replace(/([bdgkt])h/g, "$1").replace(/(.)\1+/g, "$1").replace(/y$/, "i");
+}
+function editSim(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return 1 - prev[b.length] / Math.max(a.length, b.length);
+}
+/** How close a title is to what was typed (0-1). A title that starts with the query counts as a match (typing in progress). */
+function titleSim(q, it) {
+  const k = fuzzKey(q);
+  if (!k) return 0;
+  const names = [it.title, it.originalTitle].filter(Boolean);
+  return Math.max(...[...names, ...names.map((t) => String(t).replace(/^(the|a|an)\s+/i, ""))].map((t) => {
+    const tk = fuzzKey(t), head = fuzzKey(String(t).split(/[:(\-–]/)[0]);
+    if (tk.startsWith(k) || head === k) return 1;
+    return Math.max(editSim(k, tk), editSim(k, head), k.length >= 4 ? editSim(k, tk.slice(0, k.length)) * 0.92 : 0);
+  }));
+}
+const closeMatch = (q, items) => !fuzzKey(q) || items.some((it) => titleSim(q, it) >= 0.86);
+async function spellingsFor(q) {
+  const out = [], add = (c) => { c = String(c || "").replace(/\s*\([^)]*\)\s*$/, "").trim(); if (c && fuzzKey(c) !== fuzzKey(q) && !out.some((o) => fuzzKey(o) === fuzzKey(c))) out.push(c); };
+  try { // Wikipedia's search corrects spelling ("did you mean"); only the typed words are sent
+    const u = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srlimit=5&srinfo=suggestion&srprop=&format=json&origin=*`;
+    const j = await fetch(u, { signal: AbortSignal.timeout(3500) }).then((r) => r.ok ? r.json() : null);
+    const sug = j && j.query && j.query.searchinfo && j.query.searchinfo.suggestion;
+    if (sug) add(sug);
+    for (const x of (j && j.query && j.query.search) || []) {
+      const t = String(x.title).replace(/\s*\(.*$/, "");
+      if (Math.max(editSim(fuzzKey(q), fuzzKey(t)), editSim(fuzzKey(q), fuzzKey(t.split(":")[0]))) >= 0.6) add(x.title);
+    }
+  } catch {}
+  // Without Wikipedia: shorter searches (TMDB matches the start of words), then rank by spelling closeness.
+  const words = q.trim().split(/\s+/), first = words[0];
+  if (fuzzKey(q).length >= 5) add(words.length > 1 ? words.slice(0, -1).join(" ") : first.slice(0, Math.max(4, Math.ceil(first.length * 0.6))));
+  if (first.length >= 5) add(first.slice(0, 3));
+  return out.slice(0, 4);
+}
+/** Search corrected spellings, keep only titles that look like what was typed, best match first. */
+async function typoSearch(q, firstItems, search) {
+  const tries = await spellingsFor(q);
+  if (!tries.length) return null;
+  const found = await Promise.all(tries.map((c) => search(c).then((xs) => ({ c, xs })).catch(() => ({ c, xs: [] }))));
+  const seen = new Set(), scored = [];
+  for (const { c, xs } of [{ c: null, xs: firstItems }, ...found])
+    for (const it of xs) if (!seen.has(it.key)) { seen.add(it.key); scored.push({ it, c, sim: titleSim(q, it) }); }
+  const good = scored.filter((x) => x.sim >= 0.6).sort((a, b) => b.sim - a.sim);
+  if (!good.length) return null;
+  const used = good[0].c && fuzzKey(good[0].it.title) !== fuzzKey(q) ? good[0].it.title : null;
+  return { items: [...good, ...scored.filter((x) => x.sim < 0.6 && x.c === null)].map((x) => x.it), used };
+}
 let discTimer = null, discSeq = 0;
 function discoverReload(debounce) {
   clearTimeout(discTimer);
@@ -1821,10 +1884,17 @@ async function discoverFetch(page) {
       const r = await rowFetch(seeRow, page); items = r.items; pages = r.pages;
     } else if (q) {
       const path = d.type === "movie" ? "search/movie" : d.type === "tv" ? "search/tv" : "search/multi";
-      const r = await Catalog.call(path, { query: q, page, language: lang, include_adult: "false",
-        primary_release_year: d.type === "movie" ? d.year : null, first_air_date_year: d.type === "tv" ? d.year : null });
       const forced = d.type === "movie" ? "MOVIE" : d.type === "tv" ? "SERIES" : null;
+      const searchFor = (query, pg) => Catalog.call(path, { query, page: pg, language: lang, include_adult: "false",
+        primary_release_year: d.type === "movie" ? d.year : null, first_air_date_year: d.type === "tv" ? d.year : null });
+      const r = await searchFor(q, page);
       items = r.results.map((x) => Catalog.item(x, forced)).filter(Boolean);
+      if (page === 1) d.didYouMean = null;
+      if (page === 1 && !d.exact && !closeMatch(q, items)) { // probably misspelt: try corrected spellings
+        const fixed = await typoSearch(q, items, (c) => searchFor(c, 1).then((x) => x.results.map((y) => Catalog.item(y, forced)).filter(Boolean)));
+        if (seq !== discSeq) return;
+        if (fixed) { items = fixed.items; d.didYouMean = fixed.used; }
+      }
       local = !!(d.lang || d.country || d.genre || (d.year && d.type === "all"));
       items = items.filter((i) => (!d.lang || i.lang === d.lang) && (!d.country || i.countries.includes(d.country)) && (!d.genre || i.genreIds.includes(d.genre)) && (!d.year || d.type !== "all" || i.year === Number(d.year)));
       pages = r.total_pages;
@@ -1991,7 +2061,7 @@ function viewProfile() {
     <div><b>On this device</b><br><span class="muted">Your library, watch history, ratings, notes, manual titles and preferences${IN_SANDBOX ? "" : ", plus your TMDB key and relay address (these never leave this browser except to TMDB or your relay)"}.</span></div>
     ${IN_SANDBOX ? `<div><b>Inside Claude</b><br><span class="muted">Your library is saved to your Claude account, private to you. This page contacts no other service.</span></div>` : `
     <div><b>In the cloud, only if you sign in</b><br><span class="muted">Your email address and a copy of your library, history, ratings, notes, manual titles and preferences, stored in the Supabase project configured for this site. Your own TMDB key and relay address only if you turn on “Sync my key to my account” (currently ${Sync.catalogMode() === "on" || (Sync.catalogMode() === "legacy" && (Catalog.key() || Catalog.relay())) ? "on" : "off"}).</span></div>
-    <div><b>Other services this app contacts</b><br><span class="muted">${Catalog.shared() ? "This site's catalog relay (a Supabase function: it sees your searches, the titles you open and your IP address, which it uses only for rate limiting in a one-way-hashed form), or " : ""}TMDB directly (your searches, the titles you open, your own API key if you added one) or your own relay instead; poster images from TMDB's image servers, falling back to the public image proxy wsrv.nl when those are blocked (it sees which poster is requested); Google Fonts for the typeface. YouTube, IMDb and TMDB pages open only when you tap their links.</span></div>`}
+    <div><b>Other services this app contacts</b><br><span class="muted">${Catalog.shared() ? "This site's catalog relay (a Supabase function: it sees your searches, the titles you open and your IP address, which it uses only for rate limiting in a one-way-hashed form), or " : ""}TMDB directly (your searches, the titles you open, your own API key if you added one) or your own relay instead; Wikipedia's search, only when a search finds nothing close, to correct the spelling (just the words you typed are sent); poster images from TMDB's image servers, falling back to the public image proxy wsrv.nl when those are blocked (it sees which poster is requested); Google Fonts for the typeface. YouTube, IMDb and TMDB pages open only when you tap their links.</span></div>`}
   </div></section>
     <section class="section"><div class="section-head"><h2>Delete data</h2></div><div>
     <p class="small muted" style="margin:0 0 10px;max-width:65ch">Removes your whole library ${Persist.mode === "cloud" ? "from your Claude account for this page" : "from this browser"}. ${Sync.active() ? "Your cloud copy is separate: delete it from Backup &amp; sync if you want it gone too. " : ""}Export first if you want to keep anything.</p>
@@ -3141,6 +3211,7 @@ const act = {
   "lib-clear": () => { Object.assign(UI.lib, { q: "", kind: "all", status: null, interest: null, watchlist: false, year: null, lang: null, country: null, genre: null }); UI.modal = null; render(); },
   "lib-grid": () => { S.settings.grid = !S.settings.grid; S.settingsAt = now(); Persist.touchMeta(); render(); },
   // discover
+  "disc-exact": () => { UI.disc.exact = true; discoverFetch(1); },
   "disc-timepass": () => { UI.disc.timepass = !UI.disc.timepass; storage.set("reelnest.discTimepass", UI.disc.timepass ? "1" : ""); render(); },
   "disc-type": (d) => { Object.assign(UI.disc, { type: d.v, seeTitle: null, seeAll: false }); discoverReload(false); },
   "disc-clear": () => { Object.assign(UI.disc, { q: "", type: "all", year: "", lang: "", country: "", genre: null, seeAll: false, seeTitle: null, items: [] }); discoverReload(false); window.scrollTo(0, 0); },
@@ -3271,7 +3342,7 @@ document.addEventListener("input", (ev) => {
   const el = ev.target, k = el.dataset.input;
   if (!k) return;
   const m = UI.modal;
-  if (k === "disc-q") { UI.disc.q = el.value; UI.disc.seeTitle = null; discoverReload(true); if (Catalog.status() !== "ready") render(); }
+  if (k === "disc-q") { UI.disc.q = el.value; UI.disc.seeTitle = null; UI.disc.exact = false; discoverReload(true); if (Catalog.status() !== "ready") render(); }
   else if (k === "lib-q") { UI.lib.q = el.value; render(); }
   else if (k === "lib-sort") { UI.lib.sort = el.value; render(); }
   else if (k === "mf") m.f[el.dataset.k] = el.value;

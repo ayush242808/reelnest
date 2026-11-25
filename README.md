@@ -109,6 +109,10 @@ Profile › Export backup produces a versioned JSON file (`reelnest-export` v1).
 - **Database roles:** `anon` has no table access. `authenticated` has select/insert/update/delete only, limited to its own rows by RLS. No TRUNCATE, TRIGGER or REFERENCES for either role, and default privileges for new tables were narrowed too.
 - **Sync** uses a transaction-id cursor, so changes committed out of order are never skipped. Client timestamps can't be later than the server clock. A device whose edit lost a conflict pulls the winning value back.
 
+## Search with misspellings
+
+If TMDB finds nothing close to what you typed, Discover tries corrected spellings. It asks Wikipedia's search, which has "did you mean" correction (only the typed words are sent), and also tries shorter searches. It then ranks the results by how close each title is to what you typed. Spelling is compared loosely, the way Indian titles get transliterated: aa/a, ee/i, oo/u, ph/f, w/v, z/j, bh/b, doubled letters and so on. A note says which title it searched for, and "Search only for…" shows exact results instead.
+
 ## Discover verdicts (public audience ratings)
 
 Discover rates titles like Moctale's meter (**Perfection**, **Go for It**, **Time Pass**, **Skip**). The score is calculated from public audience votes, not paid or critic reviews:
