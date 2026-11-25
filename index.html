@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-PAkNsjYW7a/fBPx7+84ex07e5dnOwvKquuW8L8sSJVs=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-eJkIyRkW0sSpaNeu4WlqIOyNDY5qj6p/yQN2FunzZT0=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -490,7 +490,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=28"></script>
+<script src="config.js?v=29"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -530,7 +530,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 28; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 29; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -3006,7 +3006,13 @@ window.addEventListener("popstate", (ev) => {
   else { if (UI.tab !== s.tab || UI.detail) go(s.tab, true); }
   requestAnimationFrame(() => window.scrollTo(0, s.y || 0));
 });
+/** Back to the plain Discover page: no search, filters, "See all" or spelling correction. */
+function discReset() {
+  Object.assign(UI.disc, { q: "", type: "all", year: "", lang: "", country: "", genre: null, seeAll: false, seeTitle: null, items: [], exact: false, didYouMean: null });
+}
 function go(tab, fromHistory) {
+  // Tapping Discover while already on it (not on a title) clears the search and shows the normal Discover page.
+  if (!fromHistory && tab === "discover" && UI.tab === "discover" && !UI.detail && !discIsHome()) discReset();
   if (!fromHistory) Nav.tab(tab);
   UI.tab = tab; UI.detail = null; UI.menu = null;
   render(); window.scrollTo(0, 0);
@@ -3232,7 +3238,7 @@ const act = {
   "disc-exact": () => { UI.disc.exact = true; discoverFetch(1); },
   "disc-timepass": () => { UI.disc.timepass = !UI.disc.timepass; storage.set("reelnest.discTimepass", UI.disc.timepass ? "1" : ""); render(); },
   "disc-type": (d) => { Object.assign(UI.disc, { type: d.v, seeTitle: null, seeAll: false }); discoverReload(false); },
-  "disc-clear": () => { Object.assign(UI.disc, { q: "", type: "all", year: "", lang: "", country: "", genre: null, seeAll: false, seeTitle: null, items: [] }); discoverReload(false); window.scrollTo(0, 0); },
+  "disc-clear": () => { discReset(); discoverReload(false); window.scrollTo(0, 0); },
   "disc-refresh": () => discoverHome(true),
   "disc-see": (d) => {
     const row = DISC_ROWS.find((r) => r.k === d.k);
