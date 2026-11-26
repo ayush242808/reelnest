@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-eJkIyRkW0sSpaNeu4WlqIOyNDY5qj6p/yQN2FunzZT0=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hzIBl1V3GZ7yh3QDPhjjcDOPHreCe97joMFvsMoWao8=' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -390,6 +390,10 @@ details summary { cursor: pointer; font-weight: 600; }
 .dtile-meta .verdict { margin-top: 2px; }
 .ratings-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .ratings-line a.score { color: inherit; text-decoration: none; }
+.btn.ghost.ni-btn { color: var(--ink); font-weight: 600; font-size: 14px; min-height: 38px; padding: 6px 14px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.ni-btn svg { width: 16px; height: 16px; }
+.btn.ghost.ni-btn.on { color: var(--warn); }
 .dtile-badge.on { background: var(--accent); color: var(--accent-ink); }
 .dtile-badge svg { width: 12px; height: 12px; }
 .dtile-busy { position: absolute; z-index: 4; inset: 0 0 auto 0; aspect-ratio: 2/3; display: grid; place-items: center; border-radius: 16px;
@@ -490,7 +494,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <div id="overlay"></div>
 <div id="toast-root" aria-live="polite"></div>
 
-<script src="config.js?v=29"></script>
+<script src="config.js?v=30"></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -530,7 +534,7 @@ const mins = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} mi
 const langName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "language" }).of(c) || c; } catch { return c; } };
 const countryName = (c) => { if (!c) return null; try { return new Intl.DisplayNames([navigator.language || "en"], { type: "region" }).of(c.toUpperCase()) || c; } catch { return c; } };
 const hashHue = (s) => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 360; };
-const APP_VERSION = 29; // keep in step with sw.js CACHE and config.js?v=
+const APP_VERSION = 30; // keep in step with sw.js CACHE and config.js?v=
 const storage = {
   get(k) { try { return window.localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { window.localStorage.setItem(k, v); return true; } catch { return false; } },
@@ -1469,8 +1473,9 @@ function library() {
       last: Math.max(st.addedAt || 0, ...FIELDS.map(([, a]) => st[a] || 0), ...ev.map((e) => e.createdAt)) };
   });
 }
-const followed = (x) => x.st.status === "WATCHING" || (x.st.status === "NOT_STARTED" && (x.st.watchlist || x.watched.size > 0))
-  || (x.st.status === "COMPLETED" && x.w.type === "SERIES" && /returning|production/i.test(x.w.seriesStatus || ""));
+const dismissed = (id) => !!(S.states[id] && S.states[id].interest === "NOT_INTERESTED");
+const followed = (x) => x.st.interest !== "NOT_INTERESTED" && (x.st.status === "WATCHING" || (x.st.status === "NOT_STARTED" && (x.st.watchlist || x.watched.size > 0))
+  || (x.st.status === "COMPLETED" && x.w.type === "SERIES" && /returning|production/i.test(x.w.seriesStatus || "")));
 function upcoming(lib, days) {
   const t = today(), end = days ? addDays(t, days) : null, out = [];
   for (const x of lib) {
@@ -1630,7 +1635,7 @@ function viewDiscover() {
   const pool = d.q ? d.items : unwatched(d.items), shown = ranked ? rankByVerdict(pool) : pool, hidden = d.items.length - pool.length;
   h += shown.map(discTile).join("");
   h += `</div>`;
-  if (hidden) h += `<p class="tiny muted" style="margin:8px 0 0">${hidden} title${hidden > 1 ? "s" : ""} you've already watched ${hidden > 1 ? "are" : "is"} hidden. Search to find ${hidden > 1 ? "them" : "it"}.</p>`;
+  if (hidden) h += `<p class="tiny muted" style="margin:8px 0 0">${hidden} title${hidden > 1 ? "s" : ""} you've watched or marked Not interested ${hidden > 1 ? "are" : "is"} hidden. Search to find ${hidden > 1 ? "them" : "it"}.</p>`;
   if (d.page < d.pages) h += `<div style="display:flex;justify-content:center;margin:16px 0"><button class="btn" data-act="disc-more" ${d.loading ? "disabled" : ""}>${d.loading ? "Loading…" : "Load more"}</button></div>`;
   h += `<div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-act="manual" data-title="${esc(d.q)}">Can't find it? Add it manually</button>
     <p class="tiny muted" style="margin:0">Catalog data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p></div>`;
@@ -1775,7 +1780,7 @@ function watchedAlready(key) {
   if (st.status === "COMPLETED") return true;
   return w.type === "MOVIE" && Object.values(S.events).some((e) => e.workId === key && e.deletedAt == null);
 }
-const unwatched = (items) => items.filter((it) => !watchedAlready(it.key));
+const unwatched = (items) => items.filter((it) => !watchedAlready(it.key) && !dismissed(it.key));
 function discHomeRows() {
   const d = UI.disc, any = DISC_ROWS.some((r) => (d.rows[r.k] || []).length);
   if (!any && d.rowsLoading) return skeleton();
@@ -1812,7 +1817,7 @@ function discTile(it) {
         <span class="sub">${it.year ? `<span class="num">${it.year}</span><span aria-hidden="true">·</span>` : ""}<b>${kind}</b></span>
         ${where.length ? `<span class="lang">${esc(where.join(" · "))}</span>` : ""}${verdictChip(verdictOf(it))}</span>
     </button>
-    ${onWl ? `<span class="dtile-badge on" aria-hidden="true">${I.bookmark.replace('stroke-width="2"', 'stroke-width="2.4"')}Watchlist</span>` : inLib ? `<span class="dtile-badge" aria-hidden="true">${I.check}In library</span>` : ""}
+    ${dismissed(it.key) ? `<span class="dtile-badge" aria-hidden="true">${I.x}Not interested</span>` : onWl ? `<span class="dtile-badge on" aria-hidden="true">${I.bookmark.replace('stroke-width="2"', 'stroke-width="2.4"')}Watchlist</span>` : inLib ? `<span class="dtile-badge" aria-hidden="true">${I.check}In library</span>` : ""}
     <button class="dtile-wl" data-act="disc-watchlist" data-key="${esc(it.key)}" aria-pressed="${onWl}" ${busy ? "disabled" : ""}
       aria-label="${onWl ? "Remove " + esc(it.title) + " from watchlist" : "Add " + esc(it.title) + " to watchlist"}" title="${onWl ? "On your watchlist" : "Add to watchlist"}">${I.bookmark}</button>
     ${busy ? `<span class="dtile-busy" role="status">Opening…</span>` : ""}
@@ -1946,7 +1951,7 @@ function viewLibrary() {
   const q = f.q.trim().toLowerCase();
   let items = all.filter((x) => (!q || x.w.title.toLowerCase().includes(q) || (x.w.originalTitle || "").toLowerCase().includes(q))
     && (f.kind === "all" || (f.kind === "movie" && x.w.type === "MOVIE") || (f.kind === "series" && x.w.type === "SERIES" && !x.w.isAnime) || (f.kind === "anime" && x.w.isAnime))
-    && (!f.status || x.st.status === f.status) && (!f.interest || x.st.interest === f.interest) && (!f.watchlist || x.st.watchlist)
+    && (!f.status || x.st.status === f.status) && (f.interest ? x.st.interest === f.interest : x.st.interest !== "NOT_INTERESTED") && (!f.watchlist || x.st.watchlist)
     && (!f.year || x.w.year === f.year) && (!f.lang || x.w.originalLanguage === f.lang) && (!f.country || (x.w.countries || []).includes(f.country)) && (!f.genre || (x.w.genres || []).includes(f.genre)));
   const sorters = {
     updated: (a, b) => b.last - a.last,
@@ -1956,12 +1961,14 @@ function viewLibrary() {
   };
   items.sort(sorters[f.sort]);
   if (f.sort === "release") items = [...items.filter((x) => x.w.releaseDate), ...items.filter((x) => !x.w.releaseDate)];
-  const extra = [f.status, f.interest, f.year, f.lang, f.country, f.genre].filter(Boolean).length;
+  const niCount = all.filter((x) => x.st.interest === "NOT_INTERESTED").length;
+  const extra = [f.status, f.interest === "NOT_INTERESTED" ? null : f.interest, f.year, f.lang, f.country, f.genre].filter(Boolean).length;
   h += `<div class="search"><span aria-hidden="true">${I.search}</span><label class="sr" for="lib-q">Search your library</label>
     <input id="lib-q" class="input" type="search" placeholder="Search your library" value="${esc(f.q)}" data-input="lib-q" autocomplete="off"></div>
     <div class="chips" style="margin-top:12px">
       ${[["all", "All"], ["movie", "Movies"], ["series", "Series"], ["anime", "Anime"]].map(([v, l]) => `<button class="chip" data-act="lib-kind" data-v="${v}" aria-pressed="${f.kind === v}">${l}</button>`).join("")}
       <button class="chip" data-act="lib-wl" aria-pressed="${f.watchlist}">Watchlist</button>
+      ${niCount || f.interest === "NOT_INTERESTED" ? `<button class="chip" data-act="lib-ni" aria-pressed="${f.interest === "NOT_INTERESTED"}">Not interested <span class="num">${niCount}</span></button>` : ""}
       <button class="chip" data-act="lib-filters">${I.sliders.replace("<svg", '<svg width="18" height="18"')} Filters${extra ? ` (${extra})` : ""}</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin:2px 0 12px"><span class="small muted num" style="flex:1">${items.length} of ${all.length}</span>
@@ -2607,7 +2614,10 @@ function backBar(w) {
       <button role="menuitem" data-act="toggle-anime" data-id="${esc(w.id)}">${w.isAnime ? "Not anime" : "Mark as anime"}</button>
       ${S.states[w.id] ? `<button role="menuitem" data-act="remove" data-id="${esc(w.id)}" style="color:var(--warn)">Remove from library…</button>` : ""}
     </div>` : ""}</div>` : "";
-  return `<div style="display:flex;align-items:center;justify-content:space-between;padding-top:calc(4px + env(safe-area-inset-top))"><button class="btn ghost" data-act="back" style="padding-left:6px">${I.back.replace("<svg", '<svg width="22" height="22"')} Back</button>${menu}</div>`;
+  const ni = w ? (dismissed(w.id)
+    ? `<button class="btn ghost ni-btn on" data-act="not-interested" data-id="${esc(w.id)}" aria-pressed="true" title="You marked this Not interested. Tap to undo.">${I.x}<span>Not interested</span></button>`
+    : `<button class="btn ghost ni-btn" data-act="not-interested" data-id="${esc(w.id)}" aria-pressed="false" title="Hide it from Discover for good">${I.x}<span>Not interested</span></button>`) : "";
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:calc(4px + env(safe-area-inset-top))"><button class="btn ghost" data-act="back" style="padding-left:6px">${I.back.replace("<svg", '<svg width="22" height="22"')} Back</button><div style="display:flex;align-items:center;gap:4px">${ni}${menu}</div></div>`;
 }
 function epRow(w, e, isW, t) {
   const a = airState(e.airDate, t);
@@ -3125,6 +3135,16 @@ const act = {
   "set-interest": (d) => { const u = setField(d.id, "interest", d.v); render(); toast(`Interest: ${INTEREST[d.v]}`, () => { u(); render(); }); },
   "set-watchlist": (d) => { const v = !S.states[d.id].watchlist; const u = setField(d.id, "watchlist", v); render(); toast(v ? "Added to watchlist" : "Removed from watchlist", () => { u(); render(); }); },
   "set-rating": (d) => { const v = +d.v || null; const u = setField(d.id, "rating", v); render(); toast(v ? `Rated ${v}/10` : "Rating cleared", () => { u(); render(); }); },
+  "not-interested": (d) => {
+    const id = d.id, w = S.works[id];
+    if (dismissed(id)) { const u = setField(id, "interest", "UNCLASSIFIED"); render(); toast("No longer marked Not interested", () => { u(); render(); }); return; }
+    const wasOnWl = !!(S.states[id] && S.states[id].watchlist);
+    const u1 = setField(id, "interest", "NOT_INTERESTED");      // adds it to the library if needed; undo removes it again
+    const u2 = wasOnWl ? setField(id, "watchlist", false) : null;
+    if (Nav.st() && Nav.st().detail) history.back(); else { UI.detail = null; render(); }
+    toast(`“${(w && w.title) || "Title"}” moved to Not interested. It won't appear in Discover.`, () => { if (u2) u2(); u1(); render(); });
+  },
+  "lib-ni": () => { UI.lib.interest = UI.lib.interest === "NOT_INTERESTED" ? null : "NOT_INTERESTED"; render(); },
   "lib-add": (d) => { ensureState(d.id); Persist.touch(d.id); render(); toast("Added to library"); },
   "lib-add-watchlist": (d) => { const u = setField(d.id, "watchlist", true); render(); toast("Added to watchlist", () => { u(); render(); }); },
   "movie-watch": (d) => openWatch({ id: d.id, ep: null, date: today(), rewatch: movieWatches(d.id).length > 0 }),
